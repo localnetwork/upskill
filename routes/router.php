@@ -2,7 +2,7 @@
 // Simple Router
 
 class Router {
-    private $routes = [];
+     private $routes = [];
 
     public function add($method, $path, $handler) {
         $this->routes[] = compact('method', 'path', 'handler');

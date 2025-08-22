@@ -20,4 +20,4 @@ require_once __DIR__ . '/../schemas/create_table_helper.php';
 // Use RedBean's PDO connection
 createTableFromSchema(R::getPDO(), 'users', $userSchema);
 
-echo "Migration complete.\n";
+echo "Migration complete.\n"; 

@@ -6,7 +6,7 @@ require_once __DIR__ . '/../middleware/jwt.php';
  
 $router = new Router();
  
-$router->add('GET', '/', function() {   
+$router->add('GET', '/', function() {    
     echo json_encode(['message' => 'Welcome to the API']);
 });
   
@@ -20,7 +20,9 @@ $router->add('GET', '/profile', function() {
 });  
  
 // Register route must be above dispatch
-$router->add('POST', '/register', AuthController::register());
+$router->add('POST', '/register', function() {
+    AuthController::register();
+}); 
 
    
 // Dispatch

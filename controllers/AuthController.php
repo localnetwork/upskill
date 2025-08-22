@@ -1,10 +1,9 @@
 <?php
 // Auth Controller
 require_once __DIR__ . '/../models/User.php';
-require_once __DIR__ . '/../models/UserRedBean.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+use Firebase\JWT\Key;  
 
   class AuthController { 
      private static $jwt_key = 'your_secret_key'; 
@@ -39,16 +38,15 @@ use Firebase\JWT\Key;
     // Register method using UserRedBean and validation
     public static function register() {
         $input = json_decode(file_get_contents('php://input'), true);
-        $result = UserRedBean::create($input);
-        if (isset($result['errors'])) {
-            http_response_code(422); 
+        $result = User::create($input);
+
+        if (isset($result['error']) && $result['error']) {
+            http_response_code($result['status']);
             echo json_encode(['errors' => $result['errors']]);
             return;
         }
-        echo json_encode(['user' => [
-            'id' => $result->id,  
-            'username' => $result->username
-        ]]);
+  
+        echo json_encode($result);
     } 
 }
  
