@@ -6,7 +6,7 @@ require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../config/database.php'; // for env()
 
 function jwt_middleware() {
-    $headers = getallheaders();
+    $headers = getallheaders(); 
     if (!isset($headers['Authorization'])) {
         http_response_code(401); 
         echo json_encode(['error' => 'No token provided']);
@@ -19,6 +19,6 @@ function jwt_middleware() {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid token']);
         exit;
-    } 
+    }  
     return $decoded;
 } 

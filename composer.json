@@ -2,9 +2,12 @@
   "require": {
     "firebase/php-jwt": "^6.11",
     "gabordemooij/redbean": "^5.7",
-    "rakit/validation": "^1.4"
+    "rakit/validation": "^1.4",
+    "ramsey/uuid": "^4.9"
   },
   "scripts": {
-    "start": "php -S localhost:8000 index.php"
+    "start": "php -S localhost:8000 index.php",
+    "migrate": "php migrate.php",
+    "seed": "php seeder.php"
   }
 }

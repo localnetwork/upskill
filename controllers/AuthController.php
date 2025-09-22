@@ -18,12 +18,12 @@ use Firebase\JWT\Key;
                 'iat' => time(),
                 'exp' => time() + 3600
             ];
-            $jwt = JWT::encode($payload, self::$jwt_key, 'HS256');
+            $jwt = JWT::encode($payload, self::$jwt_key, 'HS256');  
             echo json_encode(['token' => $jwt]);
         } else {
             http_response_code(401);
             echo json_encode(['error' => 'Invalid credentials']);
-        }
+        } 
     }
 
     public static function verify($token) {
@@ -31,22 +31,22 @@ use Firebase\JWT\Key;
             $decoded = JWT::decode($token, new Key(self::$jwt_key, 'HS256'));
             return $decoded;
         } catch (Exception $e) {
-            return false;
+            return false; 
         } 
-    } 
+    }  
 
     // Register method using UserRedBean and validation
     public static function register() {
         $input = json_decode(file_get_contents('php://input'), true);
         $result = User::create($input);
-
+ 
         if (isset($result['error']) && $result['error']) {
             http_response_code($result['status']);
-            echo json_encode(['errors' => $result['errors']]);
+            echo json_encode(['errors' => $result['errors']]);  
             return;
         }
   
         echo json_encode($result);
     } 
-}
+} 
  

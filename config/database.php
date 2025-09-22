@@ -1,18 +1,20 @@
 <?php
-
-
-use RedBeanPHP\R; 
+use RedBeanPHP\R;
 
 require_once __DIR__ . '/../vendor/autoload.php';
- 
-require_once __DIR__ . '/../config/env.php';   
- 
-// Use env() helper for DB    
+require_once __DIR__ . '/../config/env.php';
+
 $host = env('DB_HOST', 'localhost');
-$db   = env('DB_NAME', 'upskill'); 
-$user = env('DB_USER', 'root');   
+$db   = env('DB_NAME', 'upskill');
+$user = env('DB_USER', 'root');
 $pass = env('DB_PASS', '');
-$port = env('DB_PORT', '3390');
+$port = env('DB_PORT', '3390'); // ✅ default MySQL port
 
 R::setup("mysql:host=$host;port=$port;dbname=$db", $user, $pass);
-R::freeze(false); 
+
+// Development: allow schema changes
+R::freeze(false);
+
+// Optional: show queries while debugging 
+// R::debug(true);
+ 
