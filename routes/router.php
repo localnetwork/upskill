@@ -37,6 +37,12 @@ class Router {
      * Dispatch the request to the matched route.
      */
     public function dispatch($method, $uri) {
+        // Handle preflight OPTIONS requests
+        if ($method === 'OPTIONS') {
+            http_response_code(200);
+            return;
+        } 
+
         // Remove query string
         $uri = strtok($uri, '?');
         // Remove trailing slash (except for root)

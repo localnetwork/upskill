@@ -16,9 +16,9 @@ function jwt_middleware() {
     $jwt_secret = env('JWT_SECRET', 'your_secret_key');
     $decoded = AuthController::verify($token, $jwt_secret);
     if (!$decoded) {
-        http_response_code(401);
+        http_response_code(401);  
         echo json_encode(['error' => 'Invalid token']);
-        exit;
+        exit; 
     }  
     return $decoded;
 } 

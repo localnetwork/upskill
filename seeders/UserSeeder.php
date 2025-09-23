@@ -44,5 +44,5 @@ class UserSeeder
 
         echo "✅ UserSeeder completed.\n";
     }
-} 
+}
  
