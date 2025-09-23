@@ -35,46 +35,52 @@ class User
             'email'            => 'required|regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/'
         ], [
             'username:regex'        => 'Username can only contain letters, numbers, dashes (-), underscores (_), or @.',
-            'firstname:min'        => 'Firstname must be at least 2 characters long.',
-            'lastname:min'         => 'Lastname must be at least 2 characters long.',
+            'firstname:min'         => 'Firstname must be at least 2 characters long.',
+            'lastname:min'          => 'Lastname must be at least 2 characters long.',
             'password:regex'        => 'Password must contain at least one letter, one number, and one special character.',
             'confirm_password:same' => 'Confirm password must match the password.',
             'email:regex'           => 'Please enter a valid email address (e.g. name@example.com).',
         ]);
         $validation->validate();
 
-        // Check if email or username already exists
+        // ✅ Only check database if initial validation passed
         if (!$validation->fails()) {
-            $exists = \RedBeanPHP\R::findOne(
-                'users',
-                'email = ? OR username = ?',
-                [$data['email'], $data['username']]
-            );
+            // Check if username already exists
+            if (\RedBeanPHP\R::findOne('users', 'username = ?', [$data['username']])) {
+                $validation->errors()->add(
+                    'username',
+                    'custom',
+                    'The username is already taken. Please try another.'
+                );
+            }
 
-            if ($exists) {
+            // Check if email already exists
+            if (\RedBeanPHP\R::findOne('users', 'email = ?', [$data['email']])) {
                 $validation->errors()->add(
                     'email',
                     'custom',
-                    'The email or username is already taken. Please try another.'
+                    'The email is already registered. Please use a different email.'
                 );
             }
         }
 
         if ($validation->fails()) {
             return [
-                'error'  => true,
-                'status' => 422,
-                'errors' => $validation->errors()->firstOfAll(),
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
                 'message' => 'Please check the validated fields.'
             ];
         }
 
-        // Save user
+        // ✅ Save user if no validation errors
         $user = \RedBeanPHP\R::dispense('users');
-        $user->uuid     = Uuid::uuid4()->toString();
-        $user->username = $data['username'];
-        $user->password = password_hash($data['password'], PASSWORD_DEFAULT);
-        $user->email    = $data['email'];
+        $user->uuid      = Uuid::uuid4()->toString();
+        $user->username  = $data['username'];
+        $user->password  = password_hash($data['password'], PASSWORD_DEFAULT);
+        $user->email     = $data['email'];
+        $user->firstname = $data['firstname'];
+        $user->lastname  = $data['lastname'];
 
         try {
             $id = \RedBeanPHP\R::store($user);
@@ -86,16 +92,32 @@ class User
             ];
         }
 
-        return [
-            "user" => [
-                "id"       => $id,
-                "uuid"     => $user->uuid,
-                "username" => $user->username,
-                "email"    => $user->email,
-            ],
-            "message" => "User created successfully",
+        $roles = getUserRoles($user->id);
+        $payload = [
+            'sub'   => $user->id,
+            'uuid'  => $user->uuid,
+            'roles' => $roles,
+            'iat'   => time(),
+            'exp'   => time() + 3600
         ];
+        $jwt = JWT::encode($payload, self::jwtKey(), 'HS256');
+
+        echo json_encode([
+            'status' => 'success',
+            'token'  => $jwt,
+            'user'   => [
+                'id'        => $user->id,
+                'username'  => $user->username,
+                'firstname' => $user->firstname,
+                'lastname'  => $user->lastname,
+                'email'     => $user->email,
+                'uuid'      => $user->uuid,
+                'roles'     => $roles
+            ]
+        ]);
+        exit;
     }
+
 
 
     public static function login(array $data)
