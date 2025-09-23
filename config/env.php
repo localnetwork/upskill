@@ -1,6 +1,7 @@
 <?php
 // env() helper for loading environment variables from .env
-function env($key, $default = null) {
+function env($key, $default = null)
+{
     static $env = null;
     if ($env === null) {
         $env = [];
