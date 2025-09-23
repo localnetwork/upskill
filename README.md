@@ -1,4 +1,4 @@
-# Upskill Management System
+# Upskill E-learning System
 
 ## Setup
 
@@ -15,7 +15,10 @@
 Start the PHP development server:
 
 ```bash
-php -S localhost:8000 index.php
+composer install     # to download dependencies
+composer run migrate # to create database tables
+composer run seed    # to seed data
+composer run start   # to start the application
 ```
 
 The application will be available at `http://localhost:8000`

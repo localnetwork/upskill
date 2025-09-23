@@ -12,11 +12,11 @@ $seeders = [];
 foreach (glob($path . '/*.php') as $file) { 
     require_once $file;
 
-    $className = pathinfo($file, PATHINFO_FILENAME);
+    $className = pathinfo($file, PATHINFO_FILENAME); 
 
     if (!class_exists($className)) { 
         echo "⚠️  No class found in {$file}\n";
-        continue;
+        continue; 
     }
 
     $weight = 50; // default weight if not defined

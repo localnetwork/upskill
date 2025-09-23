@@ -7,14 +7,17 @@ class UserSeeder
     public static $weight = 10; // lower runs first
      public function run(): void 
     {
-        $users = [
-            [
-                'username' => 'test',
-                'email'    => 'test@test.com',
-                'uuid'     => Uuid::uuid4()->toString(), // ✅ generated here
-                'password' => password_hash('1', PASSWORD_DEFAULT),
-            ],
-        ];
+        $users = [ 
+            [  
+                'username' => 'test', 
+                'email'    => 'test@test.com',  
+                'firstname' => 'Test',
+                'lastname'  => 'User',
+                'uuid'     => Uuid::uuid4()->toString(), // ✅ generated here 
+                'id'       => 1,
+                'password' => password_hash('test', PASSWORD_DEFAULT), 
+            ],    
+        ];   
 
         foreach ($users as $data) {
             // 🔎 Check if a user with the same email already exists
@@ -28,6 +31,8 @@ class UserSeeder
             $user = R::dispense('users');
             $user->uuid       = $data['uuid'];      // ✅ assign uuid to bean
             $user->username   = $data['username'];
+            $user->firstname  = $data['firstname'];
+            $user->lastname   = $data['lastname']; 
             $user->email      = $data['email'];
             $user->password   = $data['password'];
             $user->created_at = R::isoDateTime();

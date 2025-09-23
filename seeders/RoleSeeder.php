@@ -5,18 +5,22 @@ use Ramsey\Uuid\Uuid;
 class RoleSeeder
 {
     public static $weight = 10; // optional, lower = first
-
+ 
     public function run(): void 
     { 
         $roles = [
-            [ 
+            [  
                 'uuid' => Uuid::uuid4()->toString(), 
                 'name' => 'Admin'
-            ], 
+            ],  
             [
                 'uuid' => Uuid::uuid4()->toString(),
-                'name' => 'Member'
+                'name' => 'Teacher'
             ],
+            [ 
+                'uuid' => Uuid::uuid4()->toString(), 
+                'name' => 'Student'
+            ]
         ];
 
         foreach ($roles as $data) {
