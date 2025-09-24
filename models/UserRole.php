@@ -24,17 +24,24 @@ class UserRole
             [$uuid, $userId, $roleId, R::isoDateTime(), R::isoDateTime()]
         );
 
-        return R::getInsertID(); // ✅ returns the last inserted ID  
+        return R::getInsertID(); // ✅ returns the last inserted ID   
     }
     /** 
      * Get all roles for a given user.
      *
-     * @param int $userId
+     * @param int $userId 
      * @return array
      */
     public static function getUserRoles($userId)
     {
-        // ✅ Again, use singular bean name
-        return R::findAll('userrole', ' user_id = ? ', [(int)$userId]);
+        $sql = "
+        SELECT ur.*, r.name AS role_name 
+        FROM user_roles ur 
+        INNER JOIN roles r ON ur.role_id = r.id  
+        WHERE ur.user_id = ?
+    ";
+
+        $rows = R::getAll($sql, [(int) $userId]);
+        return array_map(fn($row) => (object) $row, $rows);
     }
 }

@@ -32,7 +32,7 @@ class AuthController
                 echo json_encode(['errors' => $result['errors']]);
                 return;
             }
-            // echo json_encode($result); 
+            // echo json_encode($result);  
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);

@@ -1,23 +1,26 @@
 <?php
+
 use RedBeanPHP\R;
 use Ramsey\Uuid\Uuid;
 
 class UserSeeder
 {
     public static $weight = 10; // lower runs first
-     public function run(): void 
+    public function run(): void
     {
-        $users = [ 
-            [  
-                'username' => 'test', 
-                'email'    => 'test@test.com',  
+        $users = [
+            [
+                'username' => 'test',
+                'email'    => 'test@test.com',
                 'firstname' => 'Test',
                 'lastname'  => 'User',
                 'uuid'     => Uuid::uuid4()->toString(), // ✅ generated here 
                 'id'       => 1,
-                'password' => password_hash('test', PASSWORD_DEFAULT), 
-            ],    
-        ];   
+                'password' => password_hash('test', PASSWORD_DEFAULT),
+                'verified' => 1,
+                'status'   => 1,
+            ],
+        ];
 
         foreach ($users as $data) {
             // 🔎 Check if a user with the same email already exists
@@ -25,16 +28,18 @@ class UserSeeder
 
             if ($existing) {
                 echo "⚠️  Skipped duplicate: {$data['email']}\n";
-                continue; // Skip inserting
+                continue; // Skip inserting 
             }
 
             $user = R::dispense('users');
             $user->uuid       = $data['uuid'];      // ✅ assign uuid to bean
             $user->username   = $data['username'];
             $user->firstname  = $data['firstname'];
-            $user->lastname   = $data['lastname']; 
+            $user->lastname   = $data['lastname'];
             $user->email      = $data['email'];
             $user->password   = $data['password'];
+            $user->verified   = 1;
+            $user->status     = 1;
             $user->created_at = R::isoDateTime();
             $user->updated_at = R::isoDateTime();
             R::store($user);
@@ -45,4 +50,3 @@ class UserSeeder
         echo "✅ UserSeeder completed.\n";
     }
 }
- 

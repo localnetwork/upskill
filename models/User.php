@@ -80,6 +80,8 @@ class User
             $user->email     = $data['email'];
             $user->firstname = $data['firstname'];
             $user->lastname  = $data['lastname'];
+            $user->verified  = 0;
+            $user->status    = 1;
 
             $userId = R::store($user); // may throw exception
 
@@ -123,7 +125,9 @@ class User
                 'lastname'  => $user->lastname,
                 'email'     => $user->email,
                 'uuid'      => $user->uuid,
-                'roles'     => $roles
+                'roles'     => $roles,
+                'verified'  => $user->verified,
+                'status'    => $user->status
             ]
         ]);
         exit;
@@ -185,7 +189,9 @@ class User
                     'lastname' => $user->lastname,
                     'email'    => $user->email,
                     'uuid'     => $user->uuid,
-                    'roles'    => $roles
+                    'verified' => $user->verified,
+                    'status'   => $user->status,
+                    'roles'    => $roles,
                 ]
             ]);
             exit;
