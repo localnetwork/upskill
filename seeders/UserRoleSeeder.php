@@ -1,4 +1,5 @@
 <?php
+
 use RedBeanPHP\R;
 use Ramsey\Uuid\Uuid;
 
@@ -7,7 +8,7 @@ class UserRoleSeeder
     public static $weight = 20; // optional, for ordering
 
     public function run(): void
-    { 
+    {
         // Find the user with username = 'test'
         $user = R::findOne('users', 'username = ?', ['test']);
 
@@ -26,11 +27,11 @@ class UserRoleSeeder
             'user_roles',
             'user_id = ? AND role_id = ?',
             [$user_id, $role_id]
-        ); 
- 
-        if ($existing) {  
-            echo "⚠️  Skipped duplicate: user_id={$user_id}, role_id={$role_id}\n"; 
-            return; 
+        );
+
+        if ($existing) {
+            echo "⚠️  Skipped duplicate: user_id={$user_id}, role_id={$role_id}\n";
+            return;
         }
 
         // Use raw insert since RedBean cannot dispense 'user_roles'
@@ -40,6 +41,6 @@ class UserRoleSeeder
         );
 
         echo "✅ Inserted user_role: user_id={$user_id}, role_id={$role_id} ({$uuid})\n";
-        echo "✅ UserRoleSeeder completed.\n"; 
+        echo "✅ UserRoleSeeder completed.\n";
     }
-} 
+}

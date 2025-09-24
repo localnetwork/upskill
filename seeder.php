@@ -4,19 +4,19 @@ require_once __DIR__ . '/config/database.php'; // R::setup()
 
 use RedBeanPHP\R;
 
-$path = __DIR__ . '/seeders';  
+$path = __DIR__ . '/seeders';
 
 $seeders = [];
 
 // Collect all seeders and their weights
-foreach (glob($path . '/*.php') as $file) { 
+foreach (glob($path . '/*.php') as $file) {
     require_once $file;
 
-    $className = pathinfo($file, PATHINFO_FILENAME); 
+    $className = pathinfo($file, PATHINFO_FILENAME);
 
-    if (!class_exists($className)) { 
+    if (!class_exists($className)) {
         echo "⚠️  No class found in {$file}\n";
-        continue; 
+        continue;
     }
 
     $weight = 50; // default weight if not defined
