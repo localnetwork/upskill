@@ -14,7 +14,7 @@ class AuthController
 
     public static function init()
     {
-        self::$jwt_key = env('JWT_SECRET_KEY', 'default_secret'); // assign here
+        self::$jwt_key = env('JWT_SECRET'); // assign here
     }
 
 
@@ -32,7 +32,7 @@ class AuthController
                 echo json_encode(['errors' => $result['errors']]);
                 return;
             }
-            // echo json_encode($result);  
+            // echo json_encode($result);   
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
@@ -41,16 +41,35 @@ class AuthController
     }
 
 
+    public static function getCurrentUser()
+    {
+        $headers = getallheaders();
+        if (!isset($headers['Authorization'])) {
+            http_response_code(401);
+            echo json_encode(['error' => 'No token provided']);
+            exit;
+        }
+        $token = str_replace('Bearer ', '', $headers['Authorization']);
+        $jwt_secret = env('JWT_SECRET',);
+        $decoded = AuthController::verify($token, $jwt_secret);
+        if (!$decoded) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid token']);
+            exit;
+        }
+        return $decoded;
+    }
+
     public static function verify($token)
     {
         try {
-            $decoded = JWT::decode($token, new Key(self::$jwt_key, 'HS256'));
+            // ✅ Use Key object with the secret & algorithm
+            $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
             return $decoded;
-        } catch (Exception $e) {
-            return false;
+        } catch (\Exception $e) {
+            return false; // Token invalid or expired
         }
     }
-
     // Register method using UserRedBean and validation
     public static function register()
     {

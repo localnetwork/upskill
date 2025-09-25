@@ -107,19 +107,28 @@ class User
         // ✅ Generate JWT only if commit succeeded
         $roles = UserRole::getUserRoles($userId);
         $payload = [
-            'sub'   => $userId,
-            'uuid'  => $user->uuid,
-            'roles' => $roles,
+            'user'   => [
+                'id'       => $user->id,
+                'username' => $user->username,
+                'firstname' => $user->firstname,
+                'lastname' => $user->lastname,
+                'email'    => $user->email,
+                'uuid'     => $user->uuid,
+                'verified' => $user->verified,
+                'status'   => $user->status,
+                'roles'    => $roles,
+            ],
             'iat'   => time(),
-            'exp'   => time() + 3600
+            'exp'   => time() + 3600 // 1 hour expiry
         ];
-        $jwt = JWT::encode($payload, self::jwtKey(), 'HS256');
+
+        $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
 
         echo json_encode([
-            'status' => 'success',
+            'message' => 'User registered successfully.',
             'token'  => $jwt,
             'user'   => [
-                'id'        => $userId,
+                'id'        => $user->id,
                 'username'  => $user->username,
                 'firstname' => $user->firstname,
                 'lastname'  => $user->lastname,
@@ -132,10 +141,6 @@ class User
         ]);
         exit;
     }
-
-
-
-
 
     public static function login(array $data)
     {
@@ -169,15 +174,23 @@ class User
             $roles = getUserRoles($user->id);
 
             $payload = [
-                'sub'   => $user->id,
-                'uuid'  => $user->uuid,
-                'roles' => $roles,
+                'user'   => [
+                    'id'       => $user->id,
+                    'username' => $user->username,
+                    'firstname' => $user->firstname,
+                    'lastname' => $user->lastname,
+                    'email'    => $user->email,
+                    'uuid'     => $user->uuid,
+                    'verified' => $user->verified,
+                    'status'   => $user->status,
+                    'roles'    => $roles,
+                ],
                 'iat'   => time(),
                 'exp'   => time() + 3600 // 1 hour expiry
             ];
 
             // ✅ Use the getter
-            $jwt = JWT::encode($payload, self::jwtKey(), 'HS256');
+            $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
 
             echo json_encode([
                 'status' => 'success',
@@ -200,6 +213,28 @@ class User
             echo json_encode(['message' => 'These credentials do not match our records.']);
             exit;
         }
+    }
+
+    public static function getPublicProfile($username)
+    {
+        $user = self::findByUsername($username);
+        if (!$user) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found']);
+            exit;
+        }
+
+        $roles = UserRole::getUserRoles($user->id);
+
+        echo json_encode([
+            'id'        => $user->id,
+            'username'  => $user->username,
+            'firstname' => $user->firstname,
+            'lastname'  => $user->lastname,
+            'uuid'      => $user->uuid,
+            'roles'     => $roles,
+        ]);
+        exit;
     }
 
     public static function findByUsername($username)

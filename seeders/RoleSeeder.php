@@ -16,11 +16,11 @@ class RoleSeeder
             ],
             [
                 'uuid' => Uuid::uuid4()->toString(),
-                'name' => 'Teacher'
+                'name' => 'Educator'
             ],
             [
                 'uuid' => Uuid::uuid4()->toString(),
-                'name' => 'Student'
+                'name' => 'Learner'
             ]
         ];
 

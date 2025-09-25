@@ -38,7 +38,7 @@ class UserRole
         SELECT ur.*, r.name AS role_name 
         FROM user_roles ur 
         INNER JOIN roles r ON ur.role_id = r.id  
-        WHERE ur.user_id = ?
+        WHERE ur.user_id = ? 
     ";
 
         $rows = R::getAll($sql, [(int) $userId]);
