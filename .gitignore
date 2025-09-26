@@ -10,5 +10,8 @@ composer.lock
 Thumbs.db
 
 # IDE
-.vscode/
+.vscode/ 
 .idea/
+
+
+/assets
