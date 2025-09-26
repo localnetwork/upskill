@@ -1,0 +1,15 @@
+# Allow direct access to assets
+
+RewriteEngine On
+
+# Skip PHP routing if the request is for an existing file inside /assets
+
+RewriteCond %{REQUEST_URI} ^/assets/
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|mp4|pdf)$">
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+</IfModule>

@@ -5,6 +5,7 @@ require_once __DIR__ . '/router.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../controllers/UserController.php';
 require_once __DIR__ . '/../controllers/CourseController.php';
+require_once __DIR__ . '/../controllers/MediaController.php';
 require_once __DIR__ . '/../middleware/jwt.php';
 require_once __DIR__ . '/../middleware/instructor.php';
 
@@ -50,6 +51,17 @@ $router->group('/api', function ($r, $prefix) {
         // List courses (not implemented)  
         // echo json_encode(['message' => 'List of courses']);   
         CourseController::getCourseByUuid(uuid: $id);
+    });
+
+    $r->add('PUT', $prefix . '/courses/<id>', function ($id) {
+        // Update course (not implemented)  
+        // echo json_encode(['message' => 'Course updated']);   
+        CourseController::updateCourseByUuid(uuid: $id);
+    });
+
+    $r->add('POST', $prefix . '/media', function () {
+        instructor_middleware();
+        MediaController::create();
     });
 });
 

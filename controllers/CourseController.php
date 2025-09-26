@@ -21,6 +21,23 @@ class CourseController
         echo json_encode($result);
     }
 
+    public static function updateCourseByUuid($uuid)
+    {
+        $input  = json_decode(file_get_contents('php://input'), true);
+        $result = Course::updateCourse($uuid, $input);
+
+        if (!empty($result['error'])) {
+            http_response_code($result['status'] ?? 500);
+            echo json_encode([
+                'message' => $result['message'] ?? 'An error occurred.',
+                'errors'  => $result['errors'] ?? null,
+            ]);
+            return;
+        }
+
+        echo json_encode($result);
+    }
+
     public static function getCourseByUuid($uuid): void
     {
         echo json_encode(Course::viewCourseByUUID($uuid));
