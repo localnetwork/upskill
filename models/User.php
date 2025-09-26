@@ -32,12 +32,12 @@ class User
     {
         $validator = new \Rakit\Validation\Validator;
         $validation = $validator->make($data, [
-            'username'         => 'required|min:3|regex:/^[A-Za-z0-9@_-]+$/',
-            'firstname'        => 'required|min:2',
-            'lastname'         => 'required|min:2',
-            'password'         => 'required|min:8|regex:/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/',
-            'confirm_password' => 'required|same:password',
-            'email'            => 'required|regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
+            'username'         => 'required|max:10|min:3|regex:/^[A-Za-z0-9@_-]+$/',
+            'firstname'        => 'required|max:30|min:2',
+            'lastname'         => 'required|max:30|min:2',
+            'password'         => 'required|max:16|min:8|regex:/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/',
+            'confirm_password' => 'required|max:16|same:password',
+            'email'            => 'required|max:60|regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
             'role'             => 'required|in:2,3', // 2 = Teacher, 3 = Student
         ], [
             'username:regex'        => 'Username can only contain letters, numbers, dashes (-), underscores (_), or @.',

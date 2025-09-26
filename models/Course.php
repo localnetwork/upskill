@@ -126,4 +126,35 @@ class Course
             'data' => $data
         ];
     }
+
+    public static function updateCourse($uuid, $data)
+    {
+        $course = R::findOne('courses', 'uuid = ?', [$uuid]);
+
+        if (!$course) {
+            http_response_code(404); // ✅ Set actual HTTP status header 
+            return [
+                'success' => false,
+                'statusCode' => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $validator = new \Rakit\Validation\Validator;
+        $validation = $validator->make($data, [
+            'title' => 'required|min:3|max:60',
+            'subtitle' => 'max:255',
+            'description' => 'min:200|max:1000',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
+                'message' => 'Please check the validated fields.'
+            ];
+        }
+    }
 }

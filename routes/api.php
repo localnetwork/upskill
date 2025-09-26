@@ -47,8 +47,8 @@ $router->group('/api', function ($r, $prefix) {
     });
 
     $r->add('GET', $prefix . '/courses/<id>', function ($id) {
-        // List courses (not implemented) 
-        // echo json_encode(['message' => 'List of courses']);  
+        // List courses (not implemented)  
+        // echo json_encode(['message' => 'List of courses']);   
         CourseController::getCourseByUuid(uuid: $id);
     });
 });
