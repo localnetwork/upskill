@@ -5,7 +5,7 @@ use Ramsey\Uuid\Uuid;
 
 class CourseLectureTypeSeeder
 {
-    public static $weight = 30; // optional, lower = first
+    public static $weight = 10; // optional, lower = first
 
     public function run(): void
     {
@@ -37,7 +37,6 @@ class CourseLectureTypeSeeder
                 continue;
             }
 
-            // $type = R::dispense('course_curriculum_types');
             R::exec(
                 "INSERT INTO course_curriculum_types (uuid, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 [$data['uuid'], $data['title'], R::isoDateTime(), R::isoDateTime()]

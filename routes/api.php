@@ -47,17 +47,22 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::create();
     });
 
+
+    $r->add('GET', $prefix . '/courses/authored', function () {
+        instructor_middleware();
+        CourseController::getAuthoredCourses();
+    });
+
     $r->add('GET', $prefix . '/courses/<id>', function ($id) {
-        // List courses (not implemented)  
-        // echo json_encode(['message' => 'List of courses']);   
         CourseController::getCourseByUuid(uuid: $id);
     });
 
+
+
     $r->add('PUT', $prefix . '/courses/<id>', function ($id) {
-        // Update course (not implemented)  
-        // echo json_encode(['message' => 'Course updated']);   
         CourseController::updateCourseByUuid(uuid: $id);
     });
+
 
     $r->add('POST', $prefix . '/media', function () {
         instructor_middleware();

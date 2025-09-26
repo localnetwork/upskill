@@ -12,26 +12,22 @@ class CourseTagSeeder
         $tags = [
             [
                 'uuid' => Uuid::uuid4()->toString(),
-                'title' => 'Web Development'
+                'title' => 'Web Development',
+                'author_id' => 1
             ],
             [
                 'uuid' => Uuid::uuid4()->toString(),
-                'title' => 'Data Science'
+                'title' => 'Data Science',
+                'author_id' => 1
             ],
         ];
 
         foreach ($tags as $data) {
-            $user = R::findOne('users', 'username = ?', ['test']);
-            if (!$user) {
-                echo "❌ User 'test' not found.\n";
-                return;
-            }
-
-            // Check if tag already exists by title and user
+            // Check if tag already exists by title (global, ignore user)
             $existing = R::findOne(
                 'course_tags',
-                'title = ? AND user_id = ?',
-                [$data['title'], $user->id]
+                'title = ?',
+                [$data['title']]
             );
 
             if ($existing) {
@@ -39,12 +35,12 @@ class CourseTagSeeder
                 continue;
             }
 
+            // Insert tag
             R::exec(
                 "INSERT INTO course_tags (uuid, title, created_at, updated_at, author_id) 
-     VALUES (?, ?, ?, ?, ?)",
-                [$data['uuid'], $data['title'], R::isoDateTime(), R::isoDateTime(), $user->id]
+                 VALUES (?, ?, ?, ?, ?)",
+                [$data['uuid'], $data['title'], R::isoDateTime(), R::isoDateTime(), $data['author_id']]
             );
-
 
             echo "✅ Inserted tag: {$data['title']} ({$data['uuid']})\n";
         }
