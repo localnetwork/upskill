@@ -1,60 +1,38 @@
 <?php
 
+require_once __DIR__ . '/../controllers/AuthController.php';
+require_once __DIR__ . '/../models/Course.php';
 
-function course_owner_middleware($courseId)
+use RedBeanPHP\R;
+
+function course_owner_middleware($id)
 {
-    // ✅ Normalize headers (case-insensitive)
-    $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+    $currentUser = AuthController::getCurrentUser();
+    $course = R::findOne('courses', 'uuid = ?', [$id]);
 
-    if (!isset($headers['authorization'])) {
-        http_response_code(401);
-        echo json_encode(['error' => 'No token provided']);
-        exit;
+    if (!$course) {
+        http_response_code(404);
+        echo json_encode([
+            'error'   => true,
+            'status'  => 404,
+            'message' => 'Course not found.'
+        ]);
+        exit; // 🔴 Stop everything
     }
 
-    // ✅ Remove "Bearer " prefix
-    $token = trim(str_ireplace('Bearer', '', $headers['authorization']));
-    if (empty($token)) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Empty token']);
-        exit;
-    }
+    // Debug log (remove in production)
+    // var_dump($currentUser->user->id, $course->author_id);
 
-    $jwt_secret = env('JWT_SECRET');
-
-    try {
-        // ✅ Verify JWT
-        $decoded = AuthController::verify($token, $jwt_secret, 'HS256');
-        if (!$decoded) {
-            throw new Exception('Invalid token');
-        }
-
-        // ✅ Check if user has Educator role
-        $roles = $decoded->user->roles ?? [];
-
-        $hasEducator = false;
-        foreach ($roles as $role) {
-            // role may be array or object depending on how it's encoded
-            $roleId   = is_object($role) ? ($role->id   ?? null) : ($role['id']   ?? null);
-            $roleName = is_object($role) ? ($role->name ?? null) : ($role['name'] ?? null);
-
-            if ($roleId == 2 || strcasecmp($roleName, 'Educator') === 0) {
-                $hasEducator = true;
-                break;
-            }
-        }
-
-        if (!$hasEducator) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Access denied. Educator role required.']);
-            exit;
-        }
-
-        // ✅ Allow the request to continue 
-        return $decoded;
-    } catch (Exception $e) {
-        http_response_code(401);
-        echo json_encode(['message' => 'Invalid token.']);
-        exit;
+    if ((int)$currentUser->user->id !== (int)$course->author_id) {
+        http_response_code(403); // 403 Forbidden is more appropriate
+        echo json_encode([
+            'error'   => true,
+            'status'  => 403,
+            'message' => 'You are not allowed to access this course.',
+            'current_user' => $currentUser->user->id,
+            'firstname' => $currentUser->user->firstname,
+            'author_id' => $course->author_id
+        ]);
+        exit; // 🔴 Must exit to prevent next middleware 
     }
 }

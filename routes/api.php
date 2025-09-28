@@ -5,9 +5,11 @@ require_once __DIR__ . '/router.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../controllers/UserController.php';
 require_once __DIR__ . '/../controllers/CourseController.php';
+require_once __DIR__ . '/../controllers/CourseGoalController.php';
 require_once __DIR__ . '/../controllers/MediaController.php';
 require_once __DIR__ . '/../middleware/jwt.php';
 require_once __DIR__ . '/../middleware/instructor.php';
+require_once __DIR__ . '/../middleware/course.php';
 
 $router = new Router();
 
@@ -47,14 +49,24 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::create();
     });
 
+    $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
+        instructor_middleware();
+        CourseGoalController::updateCourseGoal(id: $id);
+    });
+
+
 
     $r->add('GET', $prefix . '/courses/authored', function () {
         instructor_middleware();
         CourseController::getAuthoredCourses();
     });
 
+
+
     $r->add('GET', $prefix . '/courses/<id>', function ($id) {
-        CourseController::getCourseByUuid(uuid: $id);
+        instructor_middleware();
+        course_owner_middleware($id);
+        CourseController::getCourseByUuid($id);
     });
 
 

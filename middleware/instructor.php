@@ -1,47 +1,40 @@
 <?php
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
 require_once __DIR__ . '/../controllers/AuthController.php';
-require_once __DIR__ . '/../config/database.php'; // for env()
+require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/env.php';
 
 function instructor_middleware()
 {
-    // ✅ Normalize headers (case-insensitive)
     $headers = array_change_key_case(getallheaders(), CASE_LOWER);
 
     if (!isset($headers['authorization'])) {
         http_response_code(401);
-        echo json_encode(['error' => 'No token provided']);
+        echo json_encode(['error' => 'Unauthorized', 'message' => 'Authorization header missing']);
         exit;
     }
 
-    // ✅ Remove "Bearer " prefix
-    $token = trim(str_ireplace('Bearer', '', $headers['authorization']));
-    if (empty($token)) {
+    if (!preg_match('/Bearer\s(\S+)/', $headers['authorization'], $matches)) {
         http_response_code(401);
-        echo json_encode(['error' => 'Empty token']);
+        echo json_encode(['error' => 'Unauthorized', 'message' => 'Invalid Authorization format']);
         exit;
     }
 
-    $jwt_secret = env('JWT_SECRET');
+    $token = $matches[1];
 
     try {
-        // ✅ Verify JWT
-        $decoded = AuthController::verify($token, $jwt_secret, 'HS256');
-        if (!$decoded) {
-            throw new Exception('Invalid token');
-        }
+        $jwt_secret = env('JWT_SECRET');
+        $decoded = JWT::decode($token, new Key($jwt_secret, 'HS256'));
 
-        // ✅ Check if user has Educator role
+        // ✅ Check if user has the required role
         $roles = $decoded->user->roles ?? [];
-
         $hasEducator = false;
-        foreach ($roles as $role) {
-            // role may be array or object depending on how it's encoded
-            $roleId   = is_object($role) ? ($role->id   ?? null) : ($role['id']   ?? null);
-            $roleName = is_object($role) ? ($role->name ?? null) : ($role['name'] ?? null);
 
-            if ($roleId == 2 || strcasecmp($roleName, 'Educator') === 0) {
+        foreach ($roles as $role) {
+            if (strcasecmp($role->name, 'Educator') === 0) {
                 $hasEducator = true;
                 break;
             }
@@ -49,15 +42,13 @@ function instructor_middleware()
 
         if (!$hasEducator) {
             http_response_code(403);
-            echo json_encode(['error' => 'Access denied. Educator role required.']);
+            echo json_encode(['error' => 'Forbidden', 'message' => 'Educator role required']);
             exit;
         }
-
-        // ✅ Allow the request to continue 
         return $decoded;
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
         http_response_code(401);
-        echo json_encode(['message' => 'Invalid token.']);
+        echo json_encode(['error' => 'Unauthorized', 'message' => $e->getMessage()]);
         exit;
     }
 }

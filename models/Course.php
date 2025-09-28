@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config/env.php';
 
 require_once __DIR__ . '/../models/Media.php';
 require_once __DIR__ . '/../models/CourseLevel.php';
+require_once __DIR__ . '/../models/CourseGoal.php';
 
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
@@ -99,6 +100,7 @@ class Course
     {
         $course = R::findOne('courses', 'uuid = ?', [$uuid]);
 
+
         if (!$course) {
             http_response_code(404); // ✅ Set actual HTTP status header
             return [
@@ -108,7 +110,10 @@ class Course
             ];
         }
 
+        $courseGoals = CourseGoal::getCourseGoalByCourseId($course->id);
+
         $data = [
+            'id'          => $course->id,
             'title'       => $course->title,
             'subtitle'    => $course->subtitle,
             'description' => $course->description,
@@ -120,10 +125,11 @@ class Course
             'updated_at'  => $course->updated_at,
             'author_id'   => $course->author_id,
             'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
-            'instructional_level' => $course->instructional_level
+            'instructional_level' => $course->instructional_level,
+            'goals'       => $courseGoals // Include course goals 
         ];
 
-        http_response_code(200); // ✅ OK response 
+        http_response_code(200); // ✅ OK response  
         return [
             'success' => true,
             'statusCode' => 200,
@@ -148,13 +154,13 @@ class Course
             }
         }
 
-        // Auth check
+        // Auth check 
         $currentUser = AuthController::getCurrentUser();
         if (!$currentUser || !isset($currentUser->user)) {
-            http_response_code(401);
+            http_response_code(403);
             return [
                 'error'   => true,
-                'status'  => 401,
+                'status'  => 403,
                 'message' => 'Access denied.'
             ];
         }
@@ -169,6 +175,8 @@ class Course
                 'message' => 'Course not found.'
             ];
         }
+
+        $courseGoals = CourseGoal::getCourseGoalByCourseId($course->id);
 
         // Authorization
         if ((int)$currentUser->user->id !== (int)$course->author_id) {
@@ -233,7 +241,22 @@ class Course
             'success' => true,
             'status'  => 200,
             'message' => 'Course updated successfully.',
-            'data'    => $course
+            'data'    => [
+                'id'          => $course->id,
+                'title'       => $course->title,
+                'subtitle'    => $course->subtitle,
+                'description' => $course->description,
+                'slug'        => $course->slug,
+                'published'   => $course->published,
+                'status'      => $course->status,
+                'uuid'        => $course->uuid,
+                'created_at'  => $course->created_at,
+                'updated_at'  => $course->updated_at,
+                'author_id'   => $course->author_id,
+                'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
+                'instructional_level' => CourseLevel::getCourseLevelById($course->instructional_level),
+                'goals'       => $courseGoals // Include course goals
+            ]
         ];
     }
 

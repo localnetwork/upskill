@@ -1,7 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../models/Course.php';
-
+require_once __DIR__ . '/../controllers/AuthController.php';
 class CourseController
 {
     // Controller methods here
@@ -40,6 +40,7 @@ class CourseController
 
     public static function getCourseByUuid($uuid): void
     {
+
         echo json_encode(Course::viewCourseByUUID($uuid));
     }
 

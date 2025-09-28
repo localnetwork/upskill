@@ -49,12 +49,16 @@ class AuthController
             echo json_encode(['error' => 'No token provided']);
             exit;
         }
+
         $token = str_replace('Bearer ', '', $headers['Authorization']);
-        $jwt_secret = env('JWT_SECRET',);
-        $decoded = AuthController::verify($token, $jwt_secret);
+
+
+        // $decoded = AuthController::verify($token, env('JWT_SECRET'));
+        $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
+
         if (!$decoded) {
             http_response_code(401);
-            echo json_encode(['message' => 'Invalid token']);
+            echo json_encode(['message' => 'From getCurrentUser: Invalid or expired token']);
             exit;
         }
         return $decoded;

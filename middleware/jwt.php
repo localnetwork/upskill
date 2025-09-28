@@ -14,7 +14,7 @@ function jwt_middleware()
         exit;
     }
     $token = str_replace('Bearer ', '', $headers['Authorization']);
-    $jwt_secret = env('JWT_SECRET', 'your_secret_key');
+    $jwt_secret = env('JWT_SECRET');
     $decoded = AuthController::verify($token, $jwt_secret);
     if (!$decoded) {
         http_response_code(401);
