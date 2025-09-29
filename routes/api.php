@@ -10,6 +10,9 @@ require_once __DIR__ . '/../controllers/MediaController.php';
 require_once __DIR__ . '/../middleware/jwt.php';
 require_once __DIR__ . '/../middleware/instructor.php';
 require_once __DIR__ . '/../middleware/course.php';
+require_once __DIR__ . '/../controllers/CourseSectionController.php';
+
+require_once __DIR__ . '/../controllers/CourseCurriculumController.php';
 
 $router = new Router();
 
@@ -49,8 +52,33 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::create();
     });
 
+    $r->add('POST', $prefix . '/course-sections', function () {
+        // instructor_middleware();
+        CourseSectionController::createSection();
+    });
+
+    $r->add('GET', $prefix . '/course-sections/course/<id>', function ($id) {
+        // instructor_middleware();
+        CourseSectionController::getSectionsByCourseId($id);
+    });
+
+    $r->add('PUT', $prefix . '/course-sections/<id>', function ($id) {
+        // instructor_middleware(); 
+        CourseSectionController::updateSectionById($id);
+    });
+
+    $r->add('DELETE', $prefix . '/course-sections/<id>', function ($id) {
+        // instructor_middleware();  
+        CourseSectionController::deleteSectionById($id);
+    });
+
+    $r->add('POST', $prefix . '/course-curriculums', function () {
+        CourseCurriculumController::createCurriculum();
+    });
+
     $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
         instructor_middleware();
+        // course_owner_middleware($id); 
         CourseGoalController::updateCourseGoal(id: $id);
     });
 

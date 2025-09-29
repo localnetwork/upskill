@@ -2,6 +2,7 @@
 return [
     '_weight' => 20,
     'title' => 'VARCHAR(255) NOT NULL',
+    'section_description' => 'TEXT NOT NULL',
     'author_id' => 'INT(255) NOT NULL',
     'course_id' => 'INT(255) NOT NULL',
     '_foreign' => [

@@ -129,7 +129,7 @@ class Course
             'goals'       => $courseGoals // Include course goals 
         ];
 
-        http_response_code(200); // ✅ OK response  
+        http_response_code(200); // ✅ OK response   
         return [
             'success' => true,
             'statusCode' => 200,
