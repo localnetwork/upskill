@@ -36,7 +36,7 @@ $router->group('/api', function ($r, $prefix) {
         AuthController::register();
     });
 
-    // Protected routes
+    // Protected routes 
     $r->add('GET', $prefix . '/profile', function () {
         $user = jwt_middleware();
         echo json_encode(['user' => $user]);
@@ -75,6 +75,18 @@ $router->group('/api', function ($r, $prefix) {
     $r->add('POST', $prefix . '/course-curriculums', function () {
         CourseCurriculumController::createCurriculum();
     });
+
+    $r->add('GET', $prefix . '/course-sections/<id>/curriculums', function ($id) {
+        CourseCurriculumController::getCurriculumsBySectionId($id);
+    });
+    $r->add('PUT', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::updateCurriculumById($id);
+    });
+
+    $r->add('DELETE', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::deleteCurriculumById($id);
+    });
+
 
     $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
         instructor_middleware();

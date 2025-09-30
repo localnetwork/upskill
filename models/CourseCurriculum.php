@@ -20,7 +20,7 @@ class CourseCurriculum
             'title'             => 'required|min:3|max:60',
             'description'       => 'required|min:3|max:255',
             'course_section_id' => 'required|integer',
-            'type'              => 'required|in:lecture,article,quiz,coding',
+            'curriculum_type'              => 'required|in:lecture,article,quiz,coding',
             'published'         => 'boolean'
         ]);
         $validation->validate();
@@ -39,7 +39,7 @@ class CourseCurriculum
             $title      = trim($data['title']);
             $desc       = trim($data['description']);
             $sectionId  = (int) $data['course_section_id'];
-            $type       = trim($data['type']); // map to curriculum_type
+            $type       = trim($data['curriculum_type']); // map to curriculum_type
             $published  = isset($data['published']) ? (int)$data['published'] : 1;
             $authorId   = $currentUser->user->id;
             $now        = date('Y-m-d H:i:s');
@@ -56,7 +56,7 @@ class CourseCurriculum
             }
 
 
-            // ✅ Insert matching schema
+            // ✅ Insert matching schema 
             R::exec(
                 'INSERT INTO course_curriculums 
         (uuid, title, curriculum_description, published, author_id, 
@@ -153,5 +153,112 @@ class CourseCurriculum
                 'message' => 'Database error: ' . $e->getMessage()
             ];
         }
+    }
+
+    public static function updateCurriculumById($id, $data)
+    {
+        $currentUser = AuthController::getCurrentUser();
+
+        $validator = new \Rakit\Validation\Validator();
+        $validation = $validator->make($data, [
+            'title'             => 'required|min:3|max:60',
+            'description'       => 'required|min:3|max:255',
+            'curriculum_type'   => 'required|in:lecture,article,quiz,coding',
+            'published'         => 'boolean'
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
+                'message' => 'Please check the validated fields.'
+            ];
+        }
+
+        try {
+            // Check if curriculum exists
+            $curriculum = R::findOne('course_curriculums', 'id = ?', [$id]);
+            if (!$curriculum) {
+                return [
+                    'error'   => true,
+                    'status'  => 404,
+                    'message' => 'Course curriculum not found.'
+                ];
+            }
+
+            // Check ownership
+            if ($curriculum->author_id != $currentUser->user->id) {
+                return [
+                    'error'   => true,
+                    'status'  => 403,
+                    'message' => 'You do not have permission to update this curriculum.'
+                ];
+            }
+
+            // Prepare update fields
+            $fields = [];
+            $params = [];
+
+            if (isset($data['title'])) {
+                $fields[] = 'title = ?';
+                $params[] = trim($data['title']);
+            }
+            if (isset($data['description'])) {
+                $fields[] = 'curriculum_description = ?';
+                $params[] = trim($data['description']);
+            }
+            if (isset($data['course_section_id'])) {
+                // Verify section exists
+                $sectionId = (int) $data['course_section_id'];
+                $section = CourseSection::getSectionById($sectionId);
+                if ($section['error']) {
+                    return [
+                        'error'   => true,
+                        'status'  => 404,
+                        'message' => 'Course section not found.'
+                    ];
+                }
+                $fields[] = 'course_section_id = ?';
+                $params[] = $sectionId;
+            }
+
+            // Execute update
+            R::exec("UPDATE course_curriculums SET " . implode(', ', $fields) . " WHERE id = ?", array_merge($params, [$id]));
+
+            return [
+                'error'   => false,
+                'status'  => 200,
+                'message' => 'Course curriculum updated successfully.'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'status'  => 500,
+                'message' => 'Database error: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public static function deleteCurriculumById($id)
+    {
+        // Implementation for deleting a course curriculum 
+        $curriculum = R::load('course_curriculums', $id);
+
+        if (!$curriculum->id) {
+            http_response_code(404);
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Curriculum not found.'
+            ];
+        }
+        R::trash($curriculum);
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'message' => 'Curriculum deleted successfully.'
+        ];
     }
 }

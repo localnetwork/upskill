@@ -5,6 +5,7 @@ return [
     'section_description' => 'TEXT NOT NULL',
     'author_id' => 'INT(255) NOT NULL',
     'course_id' => 'INT(255) NOT NULL',
+    'sort_order' => 'INT(11) DEFAULT 0',
     '_foreign' => [
         'fk_section_course_author' => 'FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE',
         'fk_section_course_id' => 'FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE'
