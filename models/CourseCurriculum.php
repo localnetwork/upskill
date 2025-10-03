@@ -3,14 +3,46 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/env.php';
 require_once __DIR__ . '/../models/CourseSection.php';
+require_once __DIR__ . '/../models/CourseCurriculumVideo.php';
 
-
+require_once __DIR__ . '/../models/CourseCurriculumArticle.php';
 
 use Ramsey\Uuid\Uuid;
 use RedBeanPHP\R;
 
 class CourseCurriculum
 {
+    /**  
+     * 🔹 Centralized method to attach resources by type
+     */
+    private static function _attachResourceData(array $curriculum): array
+    {
+        switch ($curriculum['curriculum_resource_type'] ?? null) {
+            case 'video':
+                $curriculum['asset'] = CourseCurriculumVideo::getVideosByCurriculumId($curriculum['id']);
+                break;
+
+            case 'article':
+                $curriculum['asset'] = CourseCurriculumArticle::getArticleByCurriculumId($curriculum['id']);
+                break;
+
+            case 'quiz':
+                $curriculum['asset'] = null; // placeholder for future Quiz model
+                break;
+
+            case 'coding_exercise':
+                $curriculum['asset'] = null; // placeholder for coding exercise model
+                break;
+
+            default:
+                // Always return consistent structure  
+                $curriculum['asset'] = null;
+                break;
+        }
+
+        return $curriculum;
+    }
+
     public static function createCurriculum($data)
     {
         $currentUser = AuthController::getCurrentUser();
@@ -20,7 +52,7 @@ class CourseCurriculum
             'title'             => 'required|min:3|max:60',
             'description'       => 'required|min:3|max:255',
             'course_section_id' => 'required|integer',
-            'curriculum_type'              => 'required|in:lecture,article,quiz,coding',
+            'curriculum_type'   => 'required|in:lecture,article,quiz,coding_exercise',
             'published'         => 'boolean'
         ]);
         $validation->validate();
@@ -39,12 +71,10 @@ class CourseCurriculum
             $title      = trim($data['title']);
             $desc       = trim($data['description']);
             $sectionId  = (int) $data['course_section_id'];
-            $type       = trim($data['curriculum_type']); // map to curriculum_type
+            $type       = trim($data['curriculum_type']);
             $published  = isset($data['published']) ? (int)$data['published'] : 1;
             $authorId   = $currentUser->user->id;
             $now        = date('Y-m-d H:i:s');
-
-
 
             $section = CourseSection::getSectionById($sectionId);
             if ($section['error']) {
@@ -55,13 +85,11 @@ class CourseCurriculum
                 ];
             }
 
-
-            // ✅ Insert matching schema 
             R::exec(
                 'INSERT INTO course_curriculums 
-        (uuid, title, curriculum_description, published, author_id, 
-         course_section_id, curriculum_type, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 (uuid, title, curriculum_description, published, author_id, 
+                  course_section_id, curriculum_type, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $uuid,
                     $title,
@@ -75,11 +103,13 @@ class CourseCurriculum
                 ]
             );
 
-            // ✅ Fetch the inserted record
             $curriculum = R::getRow(
                 'SELECT * FROM course_curriculums WHERE uuid = ?',
                 [$uuid]
             );
+
+            // 🔹 Attach resource data before returning
+            $curriculum = self::_attachResourceData($curriculum);
 
             return [
                 'error'   => false,
@@ -103,18 +133,19 @@ class CourseCurriculum
         }
 
         try {
-            // Build placeholders for IN clause (?,?,?)
             $placeholders = implode(',', array_fill(0, count($sectionIds), '?'));
 
-            // Fetch all curriculums for these section IDs
             $rows = R::getAll(
                 "SELECT * FROM course_curriculums 
              WHERE course_section_id IN ($placeholders)
-             ORDER BY created_at ASC",
+             ORDER BY sort_order ASC, created_at ASC",
                 $sectionIds
             );
 
-            // Group by section_id for easy mapping
+            foreach ($rows as &$curriculum) {
+                $curriculum = self::_attachResourceData($curriculum);
+            }
+
             $grouped = [];
             foreach ($rows as $row) {
                 $grouped[$row['course_section_id']][] = $row;
@@ -130,6 +161,7 @@ class CourseCurriculum
         }
     }
 
+
     public static function getCurriculumsBySectionId(int $sectionId)
     {
         if (empty($sectionId)) {
@@ -137,13 +169,16 @@ class CourseCurriculum
         }
 
         try {
-            // Fetch all curriculums for this section ID
             $rows = R::getAll(
                 "SELECT * FROM course_curriculums 
-             WHERE course_section_id = ?
-             ORDER BY created_at ASC",
+             WHERE course_section_id = ? 
+             ORDER BY sort_order ASC, created_at ASC",
                 [$sectionId]
             );
+
+            foreach ($rows as &$curriculum) {
+                $curriculum = self::_attachResourceData($curriculum);
+            }
 
             return $rows;
         } catch (\Exception $e) {
@@ -155,6 +190,7 @@ class CourseCurriculum
         }
     }
 
+
     public static function updateCurriculumById($id, $data)
     {
         $currentUser = AuthController::getCurrentUser();
@@ -163,7 +199,7 @@ class CourseCurriculum
         $validation = $validator->make($data, [
             'title'             => 'required|min:3|max:60',
             'description'       => 'required|min:3|max:255',
-            'curriculum_type'   => 'required|in:lecture,article,quiz,coding',
+            'curriculum_type'   => 'required|in:lecture,article,quiz,coding_exercise',
             'published'         => 'boolean'
         ]);
         $validation->validate();
@@ -178,7 +214,6 @@ class CourseCurriculum
         }
 
         try {
-            // Check if curriculum exists
             $curriculum = R::findOne('course_curriculums', 'id = ?', [$id]);
             if (!$curriculum) {
                 return [
@@ -188,7 +223,6 @@ class CourseCurriculum
                 ];
             }
 
-            // Check ownership
             if ($curriculum->author_id != $currentUser->user->id) {
                 return [
                     'error'   => true,
@@ -197,7 +231,6 @@ class CourseCurriculum
                 ];
             }
 
-            // Prepare update fields
             $fields = [];
             $params = [];
 
@@ -210,7 +243,6 @@ class CourseCurriculum
                 $params[] = trim($data['description']);
             }
             if (isset($data['course_section_id'])) {
-                // Verify section exists
                 $sectionId = (int) $data['course_section_id'];
                 $section = CourseSection::getSectionById($sectionId);
                 if ($section['error']) {
@@ -224,8 +256,12 @@ class CourseCurriculum
                 $params[] = $sectionId;
             }
 
-            // Execute update
-            R::exec("UPDATE course_curriculums SET " . implode(', ', $fields) . " WHERE id = ?", array_merge($params, [$id]));
+            if (!empty($fields)) {
+                R::exec(
+                    "UPDATE course_curriculums SET " . implode(', ', $fields) . " WHERE id = ?",
+                    array_merge($params, [$id])
+                );
+            }
 
             return [
                 'error'   => false,
@@ -241,9 +277,44 @@ class CourseCurriculum
         }
     }
 
+    public static function updateCurriculumResourceType($id, $data)
+    {
+        $currentUser = AuthController::getCurrentUser();
+
+        $validator = new \Rakit\Validation\Validator();
+        $validation = $validator->make($data, [
+            'curriculum_resource_type' => 'required|in:video,article,coding,multiple_choice,fill_blanks',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
+                'message' => 'Please check the validated fields.'
+            ];
+        }
+
+        // TODO: implement update logic here if needed
+    }
+
+    public static function getCurriculumById($id)
+    {
+        $curriculum = R::getRow(
+            'SELECT * FROM course_curriculums WHERE id = ?',
+            [$id]
+        );
+
+        if (!$curriculum) {
+            return null;
+        }
+
+        return self::_attachResourceData($curriculum);
+    }
+
     public static function deleteCurriculumById($id)
     {
-        // Implementation for deleting a course curriculum 
         $curriculum = R::load('course_curriculums', $id);
 
         if (!$curriculum->id) {
@@ -254,11 +325,71 @@ class CourseCurriculum
                 'message' => 'Curriculum not found.'
             ];
         }
+
         R::trash($curriculum);
+
         return [
             'error'   => false,
             'status'  => 200,
             'message' => 'Curriculum deleted successfully.'
+        ];
+    }
+
+    public static function sort($items, $sectionId)
+    {
+        echo json_encode($items);
+
+        if (empty($items) || empty($sectionId)) {
+            return [
+                'error'   => true,
+                'status'  => 400,
+                'message' => 'Invalid input data.'
+            ];
+        }
+
+        try {
+            $now = date('Y-m-d H:i:s');
+            foreach ($items as $index => $curriculumId) {
+                R::exec(
+                    'UPDATE course_curriculums 
+                 SET sort_order = ?, updated_at = ? 
+                 WHERE id = ? AND course_section_id = ?',
+                    [
+                        $index + 1,
+                        $now,
+                        $curriculumId,
+                        $sectionId
+                    ]
+                );
+            }
+
+            return [
+                'error'   => false,
+                'status'  => 200,
+                'message' => 'Curriculums sorted successfully.'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'status'  => 500,
+                'message' => 'Database error: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public static function getCurriculumResources($sectionIds)
+    {
+        $extractCurriculumIds = R::getCol(
+            'SELECT id FROM course_curriculums WHERE course_section_id IN (' . implode(',', array_fill(0, count($sectionIds), '?')) . ')',
+            $sectionIds
+        );
+
+        $videoCounts   = CourseCurriculumVideo::getCurriculumVideoCounts($extractCurriculumIds);
+        $articleCounts = CourseCurriculumArticle::getCurriculumArticleCounts($extractCurriculumIds);
+
+        return [
+            'video_counts'   => $videoCounts,
+            'article_counts' => $articleCounts
         ];
     }
 }

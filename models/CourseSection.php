@@ -207,4 +207,74 @@ class CourseSection
             'data'   => $sectionArray
         ];
     }
+
+    public static function getCourseSectionCount($courseId)
+    {
+        try {
+            // Sections
+            $sectionCount = (int) R::getCell(
+                'SELECT COUNT(*) FROM course_sections WHERE course_id = ?',
+                [$courseId]
+            );
+
+            // Section IDs
+            $sectionIds = R::getCol(
+                'SELECT id FROM course_sections WHERE course_id = ?',
+                [$courseId]
+            );
+
+            if (empty($sectionIds)) {
+                return [
+                    'section_count'    => $sectionCount,
+                    'curriculum_count' => 0,
+                    'video_count'      => 0,
+                    'article_count'    => 0,
+                ];
+            }
+
+            // Curriculums
+            $curriculumIds = R::getCol(
+                'SELECT id FROM course_curriculums WHERE course_section_id IN (' .
+                    R::genSlots($sectionIds) . ')',
+                $sectionIds
+            );
+
+            $curriculumCount = count($curriculumIds);
+
+            if (empty($curriculumIds)) {
+                return [
+                    'section_count'    => $sectionCount,
+                    'curriculum_count' => $curriculumCount,
+                    'video_count'      => 0,
+                    'article_count'    => 0,
+                ];
+            }
+
+            // Videos
+            $videoCount = (int) R::getCell(
+                'SELECT COUNT(*) FROM course_curriculum_videos WHERE curriculum_id IN (' .
+                    R::genSlots($curriculumIds) . ')',
+                $curriculumIds
+            );
+
+            // Articles
+            $articleCount = (int) R::getCell(
+                'SELECT COUNT(*) FROM course_curriculum_articles WHERE curriculum_id IN (' .
+                    R::genSlots($curriculumIds) . ')',
+                $curriculumIds
+            );
+
+            return [
+                'section_count'    => $sectionCount,
+                'curriculum_count' => $curriculumCount,
+                'video_count'      => $videoCount,
+                'article_count'    => $articleCount,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'message' => 'Database error: ' . $e->getMessage(),
+            ];
+        }
+    }
 }

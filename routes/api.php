@@ -14,6 +14,12 @@ require_once __DIR__ . '/../controllers/CourseSectionController.php';
 
 require_once __DIR__ . '/../controllers/CourseCurriculumController.php';
 
+require_once __DIR__ . '/../controllers/CourseCurriculumVideoController.php';
+
+require_once __DIR__ . '/../controllers/CourseCurriculumArticleController.php';
+
+require_once __DIR__ . '/../controllers/VideoController.php';
+
 $router = new Router();
 
 $router->add('GET', '/', function () {
@@ -47,6 +53,10 @@ $router->group('/api', function ($r, $prefix) {
         UserController::getUserByUsername($id);
     });
 
+    $r->add('GET', $prefix . '/courses', function () {
+        CourseController::getAllCourses();
+    });
+
     $r->add('POST', $prefix . '/courses', function () {
         instructor_middleware();
         CourseController::create();
@@ -68,19 +78,45 @@ $router->group('/api', function ($r, $prefix) {
     });
 
     $r->add('DELETE', $prefix . '/course-sections/<id>', function ($id) {
-        // instructor_middleware();  
         CourseSectionController::deleteSectionById($id);
-    });
-
-    $r->add('POST', $prefix . '/course-curriculums', function () {
-        CourseCurriculumController::createCurriculum();
     });
 
     $r->add('GET', $prefix . '/course-sections/<id>/curriculums', function ($id) {
         CourseCurriculumController::getCurriculumsBySectionId($id);
     });
+
+    $r->add('PUT', $prefix . '/course-sections/<id>/curriculums/sort', function ($id) {
+        return CourseCurriculumController::sortCurriculums($id);
+    });
+
+
+    $r->add('POST', $prefix . '/course-curriculums', function () {
+        CourseCurriculumController::createCurriculum();
+    });
+
+    $r->add('POST', $prefix . '/course-resources/videos', function () {
+        CourseCurriculumVideoController::addVideoToCurriculum();
+    });
+
+    $r->add('DELETE', $prefix . '/course-resources/videos/<id>', function ($id) {
+        CourseCurriculumVideoController::deleteVideoFromCurriculum($id);
+    });
+
+    $r->add('POST', $prefix . '/course-resources/articles', function () {
+        CourseCurriculumArticleController::addArticleToCurriculum();
+    });
+
+
+    $r->add('DELETE', $prefix . '/course-resources/articles/<id>', function ($id) {
+        CourseCurriculumArticleController::deleteArticleFromCurriculum($id);
+    });
+
     $r->add('PUT', $prefix . '/course-curriculums/<id>', function ($id) {
         CourseCurriculumController::updateCurriculumById($id);
+    });
+
+    $r->add('GET', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::getCurriculumById($id);
     });
 
     $r->add('DELETE', $prefix . '/course-curriculums/<id>', function ($id) {
@@ -90,7 +126,7 @@ $router->group('/api', function ($r, $prefix) {
 
     $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
         instructor_middleware();
-        // course_owner_middleware($id); 
+        // course_owner_middleware($id);  
         CourseGoalController::updateCourseGoal(id: $id);
     });
 
@@ -120,6 +156,10 @@ $router->group('/api', function ($r, $prefix) {
         instructor_middleware();
         MediaController::create();
     });
+
+    // $r->add('GET', '/videos/stream/<id>', function ($id) {
+    //     VideoController::stream((int) $id);
+    // });
 });
 
 // ✅ Dispatch request

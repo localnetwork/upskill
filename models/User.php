@@ -246,4 +246,32 @@ class User
     {
         return \RedBeanPHP\R::findOne('users', 'email = ?', [$email]);
     }
+
+    public static function getPublicProfileById($id)
+    {
+        $user = R::load('users', $id);
+        if (!$user->id) {
+            http_response_code(404);
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'User not found.'
+            ];
+        }
+
+        $roles = UserRole::getUserRoles($user->id);
+
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'data'    => [
+                'id'        => $user->id,
+                'username'  => $user->username,
+                'firstname' => $user->firstname,
+                'lastname'  => $user->lastname,
+                'uuid'      => $user->uuid,
+                'roles'     => $roles,
+            ]
+        ];
+    }
 }

@@ -8,6 +8,8 @@ require_once __DIR__ . '/../models/Media.php';
 require_once __DIR__ . '/../models/CourseLevel.php';
 require_once __DIR__ . '/../models/CourseGoal.php';
 
+require_once __DIR__ . '/../models/CourseSection.php';
+
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
 use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade 
@@ -344,5 +346,88 @@ class Course
                 'total_items'  => $totalCourses,
             ],
         ];
+    }
+
+    public static function browseCourses($page = 1, $perPage = 10, $filters = [])
+    {
+        try {
+            $page    = max(1, (int)$page);
+            $perPage = max(1, (int)$perPage);
+            $offset  = ($page - 1) * $perPage;
+
+
+
+            // Build where conditions dynamically
+            $conditions = ['published = 1'];
+            $params     = [];
+
+            if (!empty($filters['title'])) {
+                $conditions[] = 'title LIKE ?';
+                $params[] = '%' . $filters['title'] . '%';
+            }
+
+            if (!empty($filters['instructional_level'])) {
+                $conditions[] = 'instructional_level = ?';
+                $params[] = (int)$filters['instructional_level'];
+            }
+
+            $whereClause = 'WHERE ' . implode(' AND ', $conditions);
+
+            // Total courses for pagination
+            $totalCourses = R::count('courses', implode(' AND ', $conditions), $params);
+
+            // Build SQL
+            $limit  = (int) $perPage;
+            $offsetVal = (int) $offset;
+            $sql = "$whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offsetVal";
+
+            // Fetch paginated courses
+            $courses = R::findAll('courses', $sql, $params);
+
+            // Export beans to arrays
+            $courseData = R::exportAll($courses);
+
+            // Attach section counts   
+            foreach ($courseData as &$row) {
+                $row['author'] = User::getPublicProfileById($row['author_id']);
+                $row['cover_image'] = Media::getMediaById($row['cover_image']);
+                $row['instructional_level'] = CourseLevel::getCourseLevelById($row['instructional_level']);
+                $row['resources_count'] = CourseSection::getCourseSectionCount((int)$row['id']);
+                $row['goals'] = CourseGoal::getCourseGoalByCourseId($row['id']);
+            }
+            unset($row);
+
+            return [
+                'error' => false,
+                'message' => 'Courses retrieved successfully.',
+                'meta' => [
+                    'page'       => $page,
+                    'perPage'    => $perPage,
+                    'total'      => (int)$totalCourses,
+                    'totalPages' => ($perPage > 0 ? (int)ceil($totalCourses / $perPage) : 1),
+                ],
+                'data' => $courseData,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'status'  => 500,
+                'message' => 'Database error: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    public static function getCourseBySlug($slug)
+    {
+        $course = R::findOne('courses', 'slug = ?', [$slug]);
+        if (!$course) {
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        return R::exportAll($course);
     }
 }

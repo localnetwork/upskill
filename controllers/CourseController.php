@@ -65,4 +65,26 @@ class CourseController
         header('Content-Type: application/json');
         echo json_encode($result);
     }
+
+    public static function getAllCourses(): void
+    {
+        // Pagination params
+        $page    = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $perPage = isset($_GET['perPage']) ? max(1, (int)$_GET['perPage']) : 10;
+
+        // Dynamic filters
+        $filters = [];
+        if (!empty($_GET['title'])) {
+            $filters['title'] = $_GET['title'];
+        }
+        if (!empty($_GET['instructional_level'])) {
+            $filters['instructional_level'] = (int)$_GET['instructional_level'];
+        }
+
+        // Fetch courses 
+        $result = Course::browseCourses($page, $perPage, $filters);
+
+        header('Content-Type: application/json');
+        echo json_encode($result);
+    }
 }

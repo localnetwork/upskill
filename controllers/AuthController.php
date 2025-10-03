@@ -74,7 +74,7 @@ class AuthController
             return false; // Token invalid or expired
         }
     }
-    // Register method using UserRedBean and validation
+    // Register method using UserRedBean and validation 
     public static function register()
     {
         $input = json_decode(file_get_contents('php://input'), true);
