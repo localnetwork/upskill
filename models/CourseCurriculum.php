@@ -161,6 +161,42 @@ class CourseCurriculum
         }
     }
 
+    public static function getCurriculumsDataBySectionIds(array $sectionIds)
+    {
+        if (empty($sectionIds)) {
+            return [];
+        }
+
+        try {
+            $placeholders = implode(',', array_fill(0, count($sectionIds), '?'));
+
+            $rows = R::getAll(
+                "SELECT * FROM course_curriculums  
+             WHERE course_section_id IN ($placeholders)
+             ORDER BY sort_order ASC, created_at ASC",
+                $sectionIds
+            );
+
+            // ✅ Group curriculums by section_id
+            $grouped = [];
+            foreach ($rows as $row) {
+                $sectionId = $row['course_section_id'];
+                if (!isset($grouped[$sectionId])) {
+                    $grouped[$sectionId] = [];
+                }
+                $grouped[$sectionId][] = $row;
+            }
+
+            return $grouped;
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'status'  => 500,
+                'message' => 'Database error: ' . $e->getMessage()
+            ];
+        }
+    }
+
 
     public static function getCurriculumsBySectionId(int $sectionId)
     {

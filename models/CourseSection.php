@@ -98,6 +98,28 @@ class CourseSection
         return $sections;
     }
 
+    public static function getSectionsDataByCourseId(int $courseId)
+    {
+        $sectionsCollection = R::findAll(
+            'course_sections',
+            'course_id = ? ORDER BY created_at ASC',
+            [$courseId]
+        );
+
+        // Convert to array
+        $sections = R::exportAll($sectionsCollection);
+
+        // ✅ Pass all section IDs to fetch their curriculums
+        $sectionIds = array_column($sections, 'id');
+        $curriculums = CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds);
+
+        // Attach curriculums to each section for easy use 
+        foreach ($sections as &$section) {
+            $section['curriculums'] = $curriculums[$section['id']] ?? [];
+        }
+
+        return $sections;
+    }
 
     public static function updateSectionById(int $id, array $data)
     {

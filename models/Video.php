@@ -23,14 +23,32 @@ class Video
         $video->updated_at  = R::isoDateTime();
         $video->resource_type = 'video';
 
-        // Read binary contents of the file and assign to blob field
+        // ✅ Get estimated duration (in seconds) using ffprobe
+        $video->estimated_duration = null;
         if (!empty($data['path']) && file_exists($data['path'])) {
+            $duration = self::getVideoDuration($data['path']);
+            $video->estimated_duration = $duration;
+
+            // store video blob (optional if DB supports blob)
             $video->video_blob = file_get_contents($data['path']);
         } else {
-            $video->video_blob = null; // or throw an exception
+            $video->video_blob = null;
         }
 
         return R::store($video);
+    }
+
+    /**
+     * Get duration of a video file using ffprobe (returns seconds as float).
+     */
+    private static function getVideoDuration($filePath)
+    {
+        $cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($filePath);
+        $output = shell_exec($cmd);
+        if ($output !== null) {
+            return round((float) $output, 2); // duration in seconds (2 decimals)
+        }
+        return null;
     }
     public static function delete($id)
     {

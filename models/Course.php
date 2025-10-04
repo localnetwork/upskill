@@ -438,6 +438,7 @@ class Course
         $courseArr['instructional_level'] = CourseLevel::getCourseLevelById($course->instructional_level);
         $courseArr['resources_count']     = CourseSection::getCourseSectionCount((int) $course->id);
         $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
+        $courseArr['sections']            = CourseSection::getSectionsDataByCourseId((int) $course->id);
 
         return $courseArr;
     }
