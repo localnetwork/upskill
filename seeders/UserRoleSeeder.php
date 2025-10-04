@@ -20,7 +20,7 @@ class UserRoleSeeder
         // Assign Admin role (role_id = 1)
         $uuid = Uuid::uuid4()->toString();
         $user_id = $user->id;
-        $role_id = 2; // Educator role
+        $role_id = 2; // Instructor role 
 
         // Check if the user-role combination already exists
         $existing = R::findOne(

@@ -57,13 +57,17 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::getAllCourses();
     });
 
+    $r->add('GET', $prefix . '/courses/route/<slug>', function ($slug) {
+        CourseController::getCourseBySlug($slug);
+    });
+
     $r->add('POST', $prefix . '/courses', function () {
         instructor_middleware();
         CourseController::create();
     });
 
     $r->add('POST', $prefix . '/course-sections', function () {
-        // instructor_middleware();
+        // instructor_middleware(); 
         CourseSectionController::createSection();
     });
 

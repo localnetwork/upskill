@@ -31,18 +31,18 @@ function instructor_middleware()
 
         // ✅ Check if user has the required role
         $roles = $decoded->user->roles ?? [];
-        $hasEducator = false;
+        $hasInstructor = false;
 
         foreach ($roles as $role) {
-            if (strcasecmp($role->name, 'Educator') === 0) {
-                $hasEducator = true;
+            if (strcasecmp($role->name, 'Instructor') === 0) {
+                $hasInstructor = true;
                 break;
             }
         }
 
-        if (!$hasEducator) {
+        if (!$hasInstructor) {
             http_response_code(403);
-            echo json_encode(['error' => 'Forbidden', 'message' => 'Educator role required']);
+            echo json_encode(['error' => 'Forbidden', 'message' => 'Instructor role required']);
             exit;
         }
         return $decoded;

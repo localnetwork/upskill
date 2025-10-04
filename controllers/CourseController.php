@@ -87,4 +87,9 @@ class CourseController
         header('Content-Type: application/json');
         echo json_encode($result);
     }
+
+    public static function getCourseBySlug($slug): void
+    {
+        echo json_encode(Course::viewBySlug($slug));
+    }
 }

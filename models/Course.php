@@ -417,10 +417,11 @@ class Course
         }
     }
 
-    public static function getCourseBySlug($slug)
+    public static function viewBySlug($slug)
     {
         $course = R::findOne('courses', 'slug = ?', [$slug]);
         if (!$course) {
+            http_response_code(404);
             return [
                 'error'   => true,
                 'status'  => 404,
@@ -428,6 +429,16 @@ class Course
             ];
         }
 
-        return R::exportAll($course);
+        // Convert bean to array
+        $courseArr = $course->export();
+
+        // Add extra data
+        $courseArr['author']              = User::getPublicProfileById($course->author_id);
+        $courseArr['cover_image']         = Media::getMediaById($course->cover_image);
+        $courseArr['instructional_level'] = CourseLevel::getCourseLevelById($course->instructional_level);
+        $courseArr['resources_count']     = CourseSection::getCourseSectionCount((int) $course->id);
+        $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
+
+        return $courseArr;
     }
 }
