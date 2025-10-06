@@ -20,6 +20,28 @@ class UserSeeder
                 'verified' => 1,
                 'status'   => 1,
             ],
+            [
+                'username' => 'learner',
+                'email'    => 'learner@test.com',
+                'firstname' => 'Learner',
+                'lastname'  => 'User',
+                'uuid'     => Uuid::uuid4()->toString(),
+                'id'       => 2,
+                'password' => password_hash('test', PASSWORD_DEFAULT),
+                'verified' => 1,
+                'status'   => 1,
+            ],
+            [
+                'username' => 'instructor',
+                'email'    => 'instructor@test.com',
+                'firstname' => 'Instructor',
+                'lastname'  => 'User',
+                'uuid'     => Uuid::uuid4()->toString(),
+                'id'       => 3,
+                'password' => password_hash('test', PASSWORD_DEFAULT),
+                'verified' => 1,
+                'status'   => 1,
+            ]
         ];
 
         foreach ($users as $data) {

@@ -41,10 +41,16 @@ class AuthController
     }
 
 
-    public static function getCurrentUser()
+    public static function getCurrentUser($returnNullIfNoToken = false)
     {
         $headers = getallheaders();
+
+        // If no token and we want to return null instead of exiting
         if (!isset($headers['Authorization'])) {
+            if ($returnNullIfNoToken) {
+                return null;
+            }
+
             http_response_code(401);
             echo json_encode(['error' => 'No token provided']);
             exit;
@@ -52,16 +58,18 @@ class AuthController
 
         $token = str_replace('Bearer ', '', $headers['Authorization']);
 
+        try {
+            $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
+            return $decoded;
+        } catch (Exception $e) {
+            if ($returnNullIfNoToken) {
+                return null;
+            }
 
-        // $decoded = AuthController::verify($token, env('JWT_SECRET'));
-        $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
-
-        if (!$decoded) {
             http_response_code(401);
-            echo json_encode(['message' => 'From getCurrentUser: Invalid or expired token']);
+            echo json_encode(['message' => 'Invalid or expired token']);
             exit;
         }
-        return $decoded;
     }
 
     public static function verify($token)

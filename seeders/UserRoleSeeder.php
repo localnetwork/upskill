@@ -9,38 +9,49 @@ class UserRoleSeeder
 
     public function run(): void
     {
-        // Find the user with username = 'test'
-        $user = R::findOne('users', 'username = ?', ['test']);
+        $user_roles = [
+            [
+                'user_id' => 1,
+                'role_id' => 2, // Admin
+            ],
+            [
+                'user_id' => 2,
+                'role_id' => 3,  // Learner
+            ],
+            [
+                'user_id' => 3,
+                'role_id' => 2, // Instructor
+            ],
+        ];
 
-        if (!$user) {
-            echo "❌ User with username 'test' not found.\n";
-            return;
+        foreach ($user_roles as $ur) {
+            $user_id = $ur['user_id'];
+            $role_id = $ur['role_id'];
+
+            // Check if this user-role combo already exists
+            $existing = R::findOne(
+                'user_roles',
+                'user_id = ? AND role_id = ?',
+                [$user_id, $role_id]
+            );
+
+            if ($existing) {
+                echo "⚠️  Skipped duplicate: user_id={$user_id}, role_id={$role_id}\n";
+                continue;
+            }
+
+            $uuid = Uuid::uuid4()->toString();
+            $now  = R::isoDateTime();
+
+            R::exec(
+                "INSERT INTO user_roles (uuid, user_id, role_id, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?)",
+                [$uuid, $user_id, $role_id, $now, $now]
+            );
+
+            echo "✅ Inserted: user_id={$user_id}, role_id={$role_id} ({$uuid})\n";
         }
 
-        // Assign Admin role (role_id = 1)
-        $uuid = Uuid::uuid4()->toString();
-        $user_id = $user->id;
-        $role_id = 2; // Instructor role 
-
-        // Check if the user-role combination already exists
-        $existing = R::findOne(
-            'user_roles',
-            'user_id = ? AND role_id = ?',
-            [$user_id, $role_id]
-        );
-
-        if ($existing) {
-            echo "⚠️  Skipped duplicate: user_id={$user_id}, role_id={$role_id}\n";
-            return;
-        }
-
-        // Use raw insert since RedBean cannot dispense 'user_roles'
-        R::exec(
-            "INSERT INTO user_roles (uuid, user_id, role_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            [$uuid, $user_id, $role_id, R::isoDateTime(), R::isoDateTime()]
-        );
-
-        echo "✅ Inserted user_role: user_id={$user_id}, role_id={$role_id} ({$uuid})\n";
-        echo "✅ UserRoleSeeder completed.\n";
+        echo "🎉 UserRoleSeeder completed.\n";
     }
 }

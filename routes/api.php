@@ -20,6 +20,8 @@ require_once __DIR__ . '/../controllers/CourseCurriculumArticleController.php';
 
 require_once __DIR__ . '/../controllers/VideoController.php';
 
+require_once __DIR__ . '/../controllers/CartController.php';
+
 $router = new Router();
 
 $router->add('GET', '/', function () {
@@ -161,9 +163,19 @@ $router->group('/api', function ($r, $prefix) {
         MediaController::create();
     });
 
-    // $r->add('GET', '/videos/stream/<id>', function ($id) {
-    //     VideoController::stream((int) $id);
-    // });
+    $r->add('POST', $prefix . '/cart', function () {
+        jwt_middleware();
+        CartController::addToCart();
+    });
+
+    $r->add('GET', $prefix . '/cart', function () {
+        jwt_middleware();
+        CartController::getCartItems();
+    });
+
+    $r->add('GET', $prefix . '/cart/count', function () {
+        CartController::getCartCount();
+    });
 });
 
 // ✅ Dispatch request

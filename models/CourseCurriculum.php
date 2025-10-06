@@ -50,7 +50,7 @@ class CourseCurriculum
         $validator = new \Rakit\Validation\Validator();
         $validation = $validator->make($data, [
             'title'             => 'required|min:3|max:60',
-            'description'       => 'required|min:3|max:255',
+            'description'       => 'required|min:3|max:5000',
             'course_section_id' => 'required|integer',
             'curriculum_type'   => 'required|in:lecture,article,quiz,coding_exercise',
             'published'         => 'boolean'
@@ -234,7 +234,7 @@ class CourseCurriculum
         $validator = new \Rakit\Validation\Validator();
         $validation = $validator->make($data, [
             'title'             => 'required|min:3|max:60',
-            'description'       => 'required|min:3|max:255',
+            'description'       => 'required|min:3|max:5000',
             'curriculum_type'   => 'required|in:lecture,article,quiz,coding_exercise',
             'published'         => 'boolean'
         ]);

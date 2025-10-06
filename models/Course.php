@@ -439,6 +439,7 @@ class Course
         $courseArr['resources_count']     = CourseSection::getCourseSectionCount((int) $course->id);
         $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
         $courseArr['sections']            = CourseSection::getSectionsDataByCourseId((int) $course->id);
+        $courseArr['is_in_cart']          = Cart::checkCourseInCart($course->id) || false;
 
         return $courseArr;
     }
