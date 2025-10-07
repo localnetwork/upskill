@@ -6,6 +6,12 @@ use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade
 
 
 require_once __DIR__ . '/../models/Course.php';
+
+require_once __DIR__ . '/../models/Media.php';
+
+require_once __DIR__ . '/../models/User.php';
+
+require_once __DIR__ . '/../models/CourseSection.php';
 class Cart
 {
     public static function addCart($data)
@@ -77,19 +83,34 @@ class Cart
     public static function getCurrentUserCart()
     {
         $currentUser = AuthController::getCurrentUser();
-        $carts = R::find('carts', ' user_id = ? ', [$currentUser->user->id]);
+
+        // ✅ Fetch carts ordered by creation date (newest first)
+        $carts = R::find(
+            'carts',
+            ' user_id = ? ORDER BY created_at DESC ',
+            [$currentUser->user->id]
+        );
+
         $cartItems = [];
         foreach ($carts as $cart) {
             $course = R::findOne('courses', ' id = ? ', [$cart->course_id]);
             if ($course) {
                 $cartItems[] = [
-                    'cart_id'    => $cart->id,
-                    'created_at'   => $cart->created_at,
-                    'uuid'       => $cart->uuid,
-                    'course' => $course
+                    'cart_id'     => $cart->id,
+                    'created_at'  => $cart->created_at,
+                    'uuid'        => $cart->uuid,
+                    'course' => [
+                        'uuid'        => $course->uuid,
+                        'title'       => $course->title,
+                        'slug'        => $course->slug,
+                        'cover_image' => Media::getMediaById($course->cover_image),
+                        'author' => User::getPublicProfileById($course->author_id),
+                        'resources_count'     => CourseSection::getCourseSectionCount((int) $course->id)
+                    ],
                 ];
             }
         }
+
         return [
             'error'   => false,
             'status'  => 200,
@@ -98,9 +119,28 @@ class Cart
         ];
     }
 
-    public static function removeFromCart($cartId, $userId)
+
+    public static function removeFromCart($data): array
     {
-        $cart = R::findOne('carts', ' id = ? AND user_id = ? ', [$cartId, $userId]);
+        $currentUser = AuthController::getCurrentUser();
+
+        $validator = new \Rakit\Validation\Validator();
+        $validation = $validator->make($data, [
+            'cart_id' => 'required|integer',
+        ]);
+
+
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'status'  => 400,
+                'errors'  => $validation->errors(),
+                'message' => 'Validation failed.',
+            ];
+        }
+
+        $cart = R::findOne('carts', ' id = ? AND user_id = ? ', [$data['cart_id'], $currentUser->user->id]);
         if ($cart) {
             R::trash($cart);
             return [
