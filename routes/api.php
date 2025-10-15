@@ -11,16 +11,12 @@ require_once __DIR__ . '/../middleware/jwt.php';
 require_once __DIR__ . '/../middleware/instructor.php';
 require_once __DIR__ . '/../middleware/course.php';
 require_once __DIR__ . '/../controllers/CourseSectionController.php';
-
 require_once __DIR__ . '/../controllers/CourseCurriculumController.php';
-
 require_once __DIR__ . '/../controllers/CourseCurriculumVideoController.php';
-
 require_once __DIR__ . '/../controllers/CourseCurriculumArticleController.php';
-
 require_once __DIR__ . '/../controllers/VideoController.php';
-
 require_once __DIR__ . '/../controllers/CartController.php';
+require_once __DIR__ . '/../controllers/CoursePriceTierController.php';
 
 $router = new Router();
 
@@ -31,11 +27,12 @@ $router->add('GET', '/', function () {
 // ✅ Grouped API routes
 $router->group('/api', function ($r, $prefix) {
 
-    // Public routes
+    // ==================== PUBLIC ROUTES ====================
     $r->add('GET', $prefix . '/', function () {
         echo json_encode(['message' => 'Welcome to the API']);
     });
 
+    // Auth Routes
     $r->add('POST', $prefix . '/login', function () {
         AuthController::login();
     });
@@ -44,17 +41,28 @@ $router->group('/api', function ($r, $prefix) {
         AuthController::register();
     });
 
-    // Protected routes 
+    // ==================== USER ROUTES ====================
     $r->add('GET', $prefix . '/profile', function () {
         $user = jwt_middleware();
         echo json_encode(['user' => $user]);
     });
 
-    // ✅ Dynamic user route 
+    $r->add('PUT', $prefix . '/profile', function () {
+        jwt_middleware();
+        UserController::update();
+    });
+
+    $r->add('PUT', $prefix . '/profile/user-picture', function () {
+        jwt_middleware();
+        UserController::uploadProfilePicture();
+    });
+
     $r->add('GET', $prefix . '/user/<id>', function ($id) {
         UserController::getUserByUsername($id);
     });
 
+    // ==================== COURSE ROUTES ====================
+    // Public Course Routes
     $r->add('GET', $prefix . '/courses', function () {
         CourseController::getAllCourses();
     });
@@ -63,43 +71,82 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::getCourseBySlug($slug);
     });
 
+    // Instructor Course Routes
+    $r->add('GET', $prefix . '/courses/authored', function () {
+        instructor_middleware();
+        CourseController::getAuthoredCourses();
+    });
+
     $r->add('POST', $prefix . '/courses', function () {
         instructor_middleware();
         CourseController::create();
     });
 
+    $r->add('GET', $prefix . '/courses/<id>', function ($id) {
+        instructor_middleware();
+        course_owner_middleware($id);
+        CourseController::getCourseByUuid($id);
+    });
+
+    $r->add('PUT', $prefix . '/courses/<id>', function ($id) {
+        CourseController::updateCourseByUuid(uuid: $id);
+    });
+
+    $r->add('PUT', $prefix . '/courses/<id>/pricing', function ($id) {
+        instructor_middleware();
+        CourseController::updateCoursePriceByUuid(uuid: $id);
+    });
+
+
+    $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
+        instructor_middleware();
+        CourseGoalController::updateCourseGoal(id: $id);
+    });
+
+    // ==================== COURSE SECTION ROUTES ====================
     $r->add('POST', $prefix . '/course-sections', function () {
-        // instructor_middleware(); 
         CourseSectionController::createSection();
     });
 
     $r->add('GET', $prefix . '/course-sections/course/<id>', function ($id) {
-        // instructor_middleware();
         CourseSectionController::getSectionsByCourseId($id);
-    });
-
-    $r->add('PUT', $prefix . '/course-sections/<id>', function ($id) {
-        // instructor_middleware(); 
-        CourseSectionController::updateSectionById($id);
-    });
-
-    $r->add('DELETE', $prefix . '/course-sections/<id>', function ($id) {
-        CourseSectionController::deleteSectionById($id);
     });
 
     $r->add('GET', $prefix . '/course-sections/<id>/curriculums', function ($id) {
         CourseCurriculumController::getCurriculumsBySectionId($id);
     });
 
+    $r->add('PUT', $prefix . '/course-sections/<id>', function ($id) {
+        CourseSectionController::updateSectionById($id);
+    });
+
     $r->add('PUT', $prefix . '/course-sections/<id>/curriculums/sort', function ($id) {
         return CourseCurriculumController::sortCurriculums($id);
     });
 
+    $r->add('DELETE', $prefix . '/course-sections/<id>', function ($id) {
+        CourseSectionController::deleteSectionById($id);
+    });
 
+    // ==================== COURSE CURRICULUM ROUTES ====================
     $r->add('POST', $prefix . '/course-curriculums', function () {
         CourseCurriculumController::createCurriculum();
     });
 
+    $r->add('GET', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::getCurriculumById($id);
+    });
+
+    $r->add('PUT', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::updateCurriculumById($id);
+    });
+
+    $r->add('DELETE', $prefix . '/course-curriculums/<id>', function ($id) {
+        CourseCurriculumController::deleteCurriculumById($id);
+    });
+
+    // ==================== COURSE RESOURCES ROUTES ====================
+    // Video Resources
     $r->add('POST', $prefix . '/course-resources/videos', function () {
         CourseCurriculumVideoController::addVideoToCurriculum();
     });
@@ -108,61 +155,29 @@ $router->group('/api', function ($r, $prefix) {
         CourseCurriculumVideoController::deleteVideoFromCurriculum($id);
     });
 
+    // Article Resources
     $r->add('POST', $prefix . '/course-resources/articles', function () {
         CourseCurriculumArticleController::addArticleToCurriculum();
     });
-
 
     $r->add('DELETE', $prefix . '/course-resources/articles/<id>', function ($id) {
         CourseCurriculumArticleController::deleteArticleFromCurriculum($id);
     });
 
-    $r->add('PUT', $prefix . '/course-curriculums/<id>', function ($id) {
-        CourseCurriculumController::updateCurriculumById($id);
-    });
 
-    $r->add('GET', $prefix . '/course-curriculums/<id>', function ($id) {
-        CourseCurriculumController::getCurriculumById($id);
-    });
-
-    $r->add('DELETE', $prefix . '/course-curriculums/<id>', function ($id) {
-        CourseCurriculumController::deleteCurriculumById($id);
+    // ==================== COURSE PRICE TIERS ====================
+    $r->add('GET', $prefix . '/course-price-tiers', function () {
+        CoursePriceTierController::get();
     });
 
 
-    $r->add('PUT', $prefix . '/courses/<id>/goals', function ($id) {
-        instructor_middleware();
-        // course_owner_middleware($id);  
-        CourseGoalController::updateCourseGoal(id: $id);
-    });
-
-
-
-    $r->add('GET', $prefix . '/courses/authored', function () {
-        instructor_middleware();
-        CourseController::getAuthoredCourses();
-    });
-
-
-
-    $r->add('GET', $prefix . '/courses/<id>', function ($id) {
-        instructor_middleware();
-        course_owner_middleware($id);
-        CourseController::getCourseByUuid($id);
-    });
-
-
-
-    $r->add('PUT', $prefix . '/courses/<id>', function ($id) {
-        CourseController::updateCourseByUuid(uuid: $id);
-    });
-
-
+    // ==================== MEDIA ROUTES ====================
     $r->add('POST', $prefix . '/media', function () {
         instructor_middleware();
         MediaController::create();
     });
 
+    // ==================== CART ROUTES ====================
     $r->add('POST', $prefix . '/cart', function () {
         jwt_middleware();
         CartController::addToCart();
@@ -171,6 +186,11 @@ $router->group('/api', function ($r, $prefix) {
     $r->add('GET', $prefix . '/cart', function () {
         jwt_middleware();
         CartController::getCartItems();
+    });
+
+    $r->add('DELETE', $prefix . '/cart/<id>', function ($id) {
+        jwt_middleware();
+        CartController::removeFromCart($id);
     });
 
     $r->add('GET', $prefix . '/cart/count', function () {

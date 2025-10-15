@@ -136,7 +136,17 @@ class User
                 'uuid'      => $user->uuid,
                 'roles'     => $roles,
                 'verified'  => $user->verified,
-                'status'    => $user->status
+                'status'    => $user->status,
+                'biography' => $user->biography,
+                'headline'  => $user->headline,
+                'link_website' => $user->link_website,
+                'link_x' => $user->link_x,
+                'link_linkedin' => $user->link_linkedin,
+                'link_instagram' => $user->link_instagram,
+                'link_facebook' => $user->link_facebook,
+                'link_tiktok' => $user->link_tiktok,
+                'link_youtube' => $user->link_youtube,
+                'link_github' => $user->link_github,
             ]
         ]);
         exit;
@@ -184,6 +194,7 @@ class User
                     'verified' => $user->verified,
                     'status'   => $user->status,
                     'roles'    => $roles,
+
                 ],
                 'iat'   => time(),
                 'exp'   => time() + 3600 // 1 hour expiry
@@ -205,6 +216,17 @@ class User
                     'verified' => $user->verified,
                     'status'   => $user->status,
                     'roles'    => $roles,
+                    'biography' => $user->biography,
+                    'headline'  => $user->headline,
+                    'user_picture' => Media::getMediaById($user->user_picture),
+                    'link_website' => $user->link_website,
+                    'link_x' => $user->link_x,
+                    'link_linkedin' => $user->link_linkedin,
+                    'link_instagram' => $user->link_instagram,
+                    'link_facebook' => $user->link_facebook,
+                    'link_tiktok' => $user->link_tiktok,
+                    'link_youtube' => $user->link_youtube,
+                    'link_github' => $user->link_github,
                 ]
             ]);
             exit;
@@ -233,6 +255,17 @@ class User
             'lastname'  => $user->lastname,
             'uuid'      => $user->uuid,
             'roles'     => $roles,
+            'biography' => $user->biography,
+            'headline'  => $user->headline,
+            'user_picture' => Media::getMediaById($user->user_picture),
+            'link_website' => $user->link_website,
+            'link_x' => $user->link_x,
+            'link_linkedin' => $user->link_linkedin,
+            'link_instagram' => $user->link_instagram,
+            'link_facebook' => $user->link_facebook,
+            'link_tiktok' => $user->link_tiktok,
+            'link_youtube' => $user->link_youtube,
+            'link_github' => $user->link_github,
         ]);
         exit;
     }
@@ -271,7 +304,129 @@ class User
                 'lastname'  => $user->lastname,
                 'uuid'      => $user->uuid,
                 'roles'     => $roles,
+                'biography' => $user->biography,
+                'headline'  => $user->headline,
+                'user_picture' => Media::getMediaById($user->user_picture),
+                'link_website' => $user->link_website,
+                'link_x' => $user->link_x,
+                'link_linkedin' => $user->link_linkedin,
+                'link_instagram' => $user->link_instagram,
+                'link_facebook' => $user->link_facebook,
+                'link_tiktok' => $user->link_tiktok,
+                'link_youtube' => $user->link_youtube,
+                'link_github' => $user->link_github,
             ]
+        ];
+    }
+
+    public static function updateProfile($data)
+    {
+        $currentUser = AuthController::getCurrentUser();
+
+        if (!$currentUser) {
+            return [
+                'error'   => true,
+                'status'  => 401,
+                'message' => 'Unauthorized.'
+            ];
+        }
+
+        $validator = new \Rakit\Validation\Validator;
+        $validation = $validator->make($data, [
+            'firstname' => 'required|max:30|min:2',
+            'lastname'  => 'required|max:30|min:2',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
+                'message' => 'Please check the validated fields.'
+            ];
+        }
+
+        // ✅ Start transaction
+        R::begin();
+        try {
+            // ✅ Load the existing user
+            $user = R::load('users', id: $currentUser->user->id);
+            if (!$user->id) {
+                throw new \Exception('User not found.');
+            }
+
+            // ✅ Update only allowed fields
+            $user->firstname       = $data['firstname'];
+            $user->lastname        = $data['lastname'];
+            $user->biography       = $data['biography'] ?? $user->biography;
+            $user->headline        = $data['headline'] ?? $user->headline;
+            $user->user_picture    = Media::getMediaById($user->user_picture);
+            $user->link_website    = $data['link_website'] ?? $user->link_website;
+            $user->link_x          = $data['link_x'] ?? $user->link_x;
+            $user->link_linkedin   = $data['link_linkedin'] ?? $user->link_linkedin;
+            $user->link_instagram  = $data['link_instagram'] ?? $user->link_instagram;
+            $user->link_facebook   = $data['link_facebook'] ?? $user->link_facebook;
+            $user->link_tiktok     = $data['link_tiktok'] ?? $user->link_tiktok;
+            $user->link_youtube    = $data['link_youtube'] ?? $user->link_youtube;
+            $user->link_github     = $data['link_github'] ?? $user->link_github;
+            $user->updated_at      = R::isoDateTime();
+
+            // ✅ Save the changes
+            R::store($user);
+            R::commit();
+
+            return [
+                'error'   => false,
+                'status'  => 200,
+                'message' => 'Profile updated successfully.',
+                'data' => $user
+            ];
+        } catch (\Exception $e) {
+            R::rollback();
+            return [
+                'error'  => true,
+                'status' => 500,
+                'errors' => ['general' => 'Transaction failed: ' . $e->getMessage()],
+            ];
+        }
+    }
+
+    public static function uploadPicture($data)
+    {
+        $currentUser = AuthController::getCurrentUser();
+
+        if (!$currentUser) {
+            return [
+                'error'   => true,
+                'status'  => 401,
+                'message' => 'Unauthorized.'
+            ];
+        }
+
+        $validator = new \Rakit\Validation\Validator;
+        $validation = $validator->make($data, [
+            'user_picture' => 'required',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            http_response_code(422);
+            echo json_encode([
+                'status'  => 'error',
+                'message' => 'Please check the validated fields.',
+                'errors'  => $validation->errors()->firstOfAll()
+            ]);
+            exit;
+        }
+
+        R::exec("UPDATE users SET user_picture = ? WHERE id = ?", [$data['user_picture'], $currentUser->user->id]);
+
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'data' => Media::getMediaById($data['user_picture']),
+            'message' => 'Profile picture uploaded successfully.',
         ];
     }
 }

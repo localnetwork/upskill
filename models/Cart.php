@@ -12,6 +12,8 @@ require_once __DIR__ . '/../models/Media.php';
 require_once __DIR__ . '/../models/User.php';
 
 require_once __DIR__ . '/../models/CourseSection.php';
+
+require_once __DIR__ . '/../models/CoursePriceTier.php';
 class Cart
 {
     public static function addCart($data)
@@ -90,10 +92,18 @@ class Cart
             ' user_id = ? ORDER BY created_at DESC ',
             [$currentUser->user->id]
         );
-
+        $total = 0.00;
         $cartItems = [];
         foreach ($carts as $cart) {
             $course = R::findOne('courses', ' id = ? ', [$cart->course_id]);
+
+            if ($course->price_tier) {
+                $priceTier = CoursePriceTier::getCoursePriceTierById($course->price_tier);
+                if ($priceTier) {
+                    $total += (float) $priceTier['price'];
+                }
+            }
+
             if ($course) {
                 $cartItems[] = [
                     'cart_id'     => $cart->id,
@@ -111,36 +121,32 @@ class Cart
             }
         }
 
+
+
         return [
             'error'   => false,
             'status'  => 200,
-            'data'    => $cartItems,
+            'data'    => [
+                'cartItems' => $cartItems,
+                'cartTotal' => number_format($total, 2),
+            ],
             'message' => 'Cart items retrieved successfully.',
         ];
     }
 
 
-    public static function removeFromCart($data): array
+    public static function removeFromCart($id): array
     {
         $currentUser = AuthController::getCurrentUser();
-
-        $validator = new \Rakit\Validation\Validator();
-        $validation = $validator->make($data, [
-            'cart_id' => 'required|integer',
-        ]);
-
-
-        $validation->validate();
-
-        if ($validation->fails()) {
+        $cart = R::findOne('carts', ' id = ? AND user_id = ? ', [$id, $currentUser->user->id]);
+        if ($currentUser->user->id !== $cart->user_id) {
             return [
-                'status'  => 400,
-                'errors'  => $validation->errors(),
-                'message' => 'Validation failed.',
+                'status'  => 403,
+                'message' => 'You are not authorized to perform this action.'
             ];
         }
 
-        $cart = R::findOne('carts', ' id = ? AND user_id = ? ', [$data['cart_id'], $currentUser->user->id]);
+
         if ($cart) {
             R::trash($cart);
             return [

@@ -34,6 +34,22 @@ class CourseController
             ]);
             return;
         }
+        echo json_encode($result);
+    }
+
+    public static function updateCoursePriceByUuid($uuid)
+    {
+        $input  = json_decode(file_get_contents('php://input'), true);
+        $result = Course::updateCoursePrice($uuid, $input);
+
+        if (!empty($result['error'])) {
+            http_response_code($result['status'] ?? 500);
+            echo json_encode([
+                'message' => $result['message'] ?? 'An error occurred.',
+                'errors'  => $result['errors'] ?? null,
+            ]);
+            return;
+        }
 
         echo json_encode($result);
     }

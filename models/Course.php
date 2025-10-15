@@ -127,6 +127,7 @@ class Course
             'updated_at'  => $course->updated_at,
             'author_id'   => $course->author_id,
             'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
+            'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
             'instructional_level' => $course->instructional_level,
             'goals'       => $courseGoals // Include course goals 
         ];
@@ -227,7 +228,7 @@ class Course
             if ($level) {
                 $course->instructional_level = $levelId;
             }
-            // else: invalid FK, retain existing value
+            // else: invalid FK, retain existing value 
         }
 
         // Cover Image (optional)
@@ -259,6 +260,96 @@ class Course
                 'instructional_level' => CourseLevel::getCourseLevelById($course->instructional_level),
                 'goals'       => $courseGoals // Include course goals
             ]
+        ];
+    }
+
+    public static function updateCoursePrice($uuid, $data = null)
+    {
+        // Parse JSON body if $data not provided 
+        if (!is_array($data)) {
+            $raw  = file_get_contents('php://input');
+            $data = json_decode($raw, true);
+            if (!is_array($data)) {
+                http_response_code(400);
+                return [
+                    'error'   => true,
+                    'status'  => 400,
+                    'message' => 'Invalid request body.'
+                ];
+            }
+        }
+        $validator = new \Rakit\Validation\Validator;
+        $validation = $validator->make($data, [
+            'price_tier' => 'required|min:1',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'error'   => true,
+                'status'  => 422,
+                'errors'  => $validation->errors()->firstOfAll(),
+                'message' => 'Please check the validated fields.'
+            ];
+        }
+
+
+        // Auth check 
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser || !isset($currentUser->user)) {
+            http_response_code(403);
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'Access denied.'
+            ];
+        }
+
+        // Find course
+        $course = R::findOne('courses', 'uuid = ?', [$uuid]);
+        if (!$course) {
+            http_response_code(404);
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $priceTier = CoursePriceTier::getCoursePriceTierById($data['price_tier']);
+
+        if (!$priceTier) {
+            http_response_code(404);
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Price tier not found.'
+            ];
+        }
+
+        // Authorization
+        if ((int)$currentUser->user->id !== (int)$course->author_id) {
+            http_response_code(403);
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'You are not authorized to update this course.'
+            ];
+        }
+
+
+
+        // Price tier FK validation
+        $tierId = (int)$data['price_tier'];
+        $tier = R::exec('UPDATE courses SET price_tier = ?, updated_at = ? WHERE uuid = ?', [
+            $tierId,
+            R::isoDateTime(),
+            $course->uuid
+        ]);
+
+        return [
+            'message' => 'Course price updated successfully.',
+            'data' => $course,
         ];
     }
 
@@ -394,6 +485,8 @@ class Course
                 $row['instructional_level'] = CourseLevel::getCourseLevelById($row['instructional_level']);
                 $row['resources_count'] = CourseSection::getCourseSectionCount((int)$row['id']);
                 $row['goals'] = CourseGoal::getCourseGoalByCourseId($row['id']);
+                $row['price_tier'] = $row['price_tier'] ? CoursePriceTier::getCoursePriceTierById($row['price_tier']) : null;
+                $row['is_in_cart'] = Cart::checkCourseInCart($row['id']) || false;
             }
             unset($row);
 
@@ -440,6 +533,7 @@ class Course
         $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
         $courseArr['sections']            = CourseSection::getSectionsDataByCourseId((int) $course->id);
         $courseArr['is_in_cart']          = Cart::checkCourseInCart($course->id) || false;
+        $courseArr['price_tier']         = CoursePriceTier::getCoursePriceTierById($course->price_tier);
 
         return $courseArr;
     }

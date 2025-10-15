@@ -4,8 +4,9 @@ return [
     'username' => 'VARCHAR(255) NOT NULL',
     'firstname' => 'VARCHAR(255) NOT NULL',
     'lastname' => 'VARCHAR(255) NOT NULL',
-    'title' => 'VARCHAR(100) DEFAULT NULL',
+    'headline' => 'VARCHAR(100) DEFAULT NULL',
     'biography' => 'TEXT DEFAULT NULL',
+    'user_picture' => 'INT(255) DEFAULT NULL',
     'link_website' => 'VARCHAR(255) DEFAULT NULL',
     'link_x' => 'VARCHAR(255) DEFAULT NULL',
     'link_linkedin' => 'VARCHAR(255) DEFAULT NULL',
@@ -18,4 +19,7 @@ return [
     'password' => 'VARCHAR(255) NOT NULL',
     'verified' => 'BOOLEAN DEFAULT FALSE',
     'status'   => 'TINYINT(1) DEFAULT 1',
+    '_foreign' => [
+        'fk_user_picture' => 'FOREIGN KEY (user_picture) REFERENCES medias(id) ON DELETE CASCADE',
+    ]
 ];

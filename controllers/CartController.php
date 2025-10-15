@@ -30,16 +30,10 @@ class CartController
         echo json_encode($result);
     }
 
-    public static function removeFromCart()
+    public static function removeFromCart($id)
     {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $result = Cart::removeFromCart($input);
+        $result = Cart::removeFromCart($id);
 
-        if (isset($result['error']) && $result['error']) {
-            http_response_code($result['status']);
-            echo json_encode(['errors' => $result['errors']]);
-            return;
-        }
         echo json_encode($result);
     }
 }
