@@ -17,7 +17,7 @@ require_once __DIR__ . '/../controllers/CourseCurriculumArticleController.php';
 require_once __DIR__ . '/../controllers/VideoController.php';
 require_once __DIR__ . '/../controllers/CartController.php';
 require_once __DIR__ . '/../controllers/CoursePriceTierController.php';
-
+require_once __DIR__ . '/../controllers/CheckoutController.php';
 $router = new Router();
 
 $router->add('GET', '/', function () {
@@ -195,6 +195,13 @@ $router->group('/api', function ($r, $prefix) {
 
     $r->add('GET', $prefix . '/cart/count', function () {
         CartController::getCartCount();
+    });
+
+
+    // ==================== CHECKOUT ROUTES ====================
+    $r->add('POST', $prefix . '/checkout', function () {
+        jwt_middleware();
+        CheckoutController::create();
     });
 });
 

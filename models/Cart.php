@@ -115,6 +115,7 @@ class Cart
                         'slug'        => $course->slug,
                         'cover_image' => Media::getMediaById($course->cover_image),
                         'author' => User::getPublicProfileById($course->author_id),
+                        'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
                         'resources_count'     => CourseSection::getCourseSectionCount((int) $course->id)
                     ],
                 ];

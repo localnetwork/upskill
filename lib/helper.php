@@ -14,7 +14,7 @@
 function createTableFromSchema(PDO $pdo, string $table, array $schema): void
 {
     // Separate meta keys
-    $columns  = []; 
+    $columns  = [];
     $indexes  = $schema['_indexes'] ?? [];
     $foreigns = $schema['_foreign'] ?? [];
 
@@ -73,12 +73,12 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
 
         // Drop columns not in schema (except id, uuid, created_at, updated_at)
         foreach ($existingCols as $name => $_) {
-            if (!in_array($name, ['id','uuid','created_at','updated_at']) && !isset($columns[$name])) {
+            if (!in_array($name, ['id', 'uuid', 'created_at', 'updated_at']) && !isset($columns[$name])) {
                 $pdo->exec("ALTER TABLE `$table` DROP COLUMN `$name`");
                 echo "➖ Dropped column `$name` from {$table}\n";
             }
         }
-    } 
+    }
 
     // Ensure uuid has unique index
     $uuidIndexCheck = $pdo->prepare("
@@ -145,18 +145,30 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
               AND TABLE_NAME = ? 
               AND CONSTRAINT_NAME = ?
         ");
-        $check->execute([$table, $name]); 
+        $check->execute([$table, $name]);
         $exists = $check->fetchColumn();
- 
+
         if (!$exists) {
             try {
                 $pdo->exec("ALTER TABLE `$table` ADD CONSTRAINT `$name` $def");
                 echo "➕ Added foreign key $name on {$table}\n";
             } catch (PDOException $e) {
                 echo "❌ Failed to add foreign key $name on {$table}: " . $e->getMessage() . "\n";
-            } 
+            }
         } else {
             echo "⚠️ Skipped existing foreign key $name on {$table}\n";
-        } 
-    }  
-}  
+        }
+    }
+}
+
+
+function orderIdGenerator($length = 10)
+{
+    $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $length; $i++) {
+        $randomString .= $characters[rand(0, $charactersLength - 1)];
+    }
+    return $randomString;
+}

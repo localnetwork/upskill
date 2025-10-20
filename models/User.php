@@ -361,7 +361,6 @@ class User
             $user->lastname        = $data['lastname'];
             $user->biography       = $data['biography'] ?? $user->biography;
             $user->headline        = $data['headline'] ?? $user->headline;
-            $user->user_picture    = Media::getMediaById($user->user_picture);
             $user->link_website    = $data['link_website'] ?? $user->link_website;
             $user->link_x          = $data['link_x'] ?? $user->link_x;
             $user->link_linkedin   = $data['link_linkedin'] ?? $user->link_linkedin;
