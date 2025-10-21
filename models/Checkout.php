@@ -36,10 +36,10 @@ class Checkout
             ];
         }
 
-        $order = Order::createOrder($currentUser->user->id);
+        $order = Order::createOrder(userId: $currentUser->user->id, paymentMethod: $data['payment_method']);
 
         if (!$order['error'] && $data['payment_method'] === 'paypal') {
-            $redirectUrl = Order::createPayPalPayment($order['data']['id'], $order['data']['total_amount']);
+            $redirectUrl = Order::createPayPalPayment($order['data']['order_id'], $order['data']['total_amount']);
             if ($redirectUrl) {
                 $order['redirect_url'] = $redirectUrl;
             } else {

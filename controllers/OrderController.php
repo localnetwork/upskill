@@ -14,12 +14,26 @@ class OrderController
             return ['error' => true, 'message' => 'Missing PayPal order token.'];
         }
 
-        return self::capturePayPalPayment($paypalOrderId);
+        return self::capturePayPalPayment(paypalOrderId: $paypalOrderId);
     }
 
     public static function capturePayPalPayment($paypalOrderId)
     {
         // Call the model method to capture the payment
         return Order::capturePayPalPayment($paypalOrderId);
+    }
+
+
+    public static function show($orderId)
+    {
+        $response = Order::getOrderByOrderId($orderId);
+
+        // Enforce the HTTP status code if it's included in the response
+        if (isset($response['status'])) {
+            http_response_code($response['status']);
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode($response);
     }
 }

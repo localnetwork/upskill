@@ -8,9 +8,11 @@ use RedBeanPHP\R; // ✅ RedBean only
 require_once __DIR__ . '/../models/CoursePriceTier.php';
 require_once __DIR__ . '/../models/Course.php';
 
+require_once __DIR__ . '/../models/OrderLine.php';
+
 class Order
 {
-    public static function createOrder($userId)
+    public static function createOrder($userId, $paymentMethod)
     {
         if (empty($userId) || !is_numeric($userId)) {
             return [
@@ -42,9 +44,10 @@ class Order
         $order->status = 'pending';
         $order->created_at = date('Y-m-d H:i:s');
         $order->updated_at = date('Y-m-d H:i:s');
+        $order->payment_method = $paymentMethod;
         $orderId = R::store($order);
 
-        // ✅ Add order lines
+        // ✅ Add order lines 
         foreach ($cartItems as $item) {
             $course = R::load('courses', $item->course_id);
             $loaded = Course::viewCourseByUUID($course->uuid);
@@ -123,8 +126,8 @@ class Order
                 ]
             ]],
             'application_context' => [
-                'return_url' => 'http://localhost:3000/checkout/success?order_id=' . $orderId,
-                'cancel_url' => 'http://localhost:3000/checkout/cancel?order_id=' . $orderId,
+                'return_url' => env('APP_URL') . '/checkout/success?order_id=' . $orderId,
+                'cancel_url' => env('APP_URL') . '/checkout/cancel?order_id=' . $orderId,
             ]
         ]);
 
@@ -160,7 +163,7 @@ class Order
         $sandbox = env('PAYPAL_SANDBOX') === 'true';
         $baseUrl = $sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
 
-        // Step 1: Get Access Token
+        // Step 1: Get Access
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
         curl_setopt($ch, CURLOPT_USERPWD, "$clientId:$secret");
@@ -191,7 +194,7 @@ class Order
 
         $data = json_decode($response, true);
 
-        // Step 3: If payment is completed, update DB
+        // Step 3: If payment is completed, update DB  
         if (isset($data['status']) && $data['status'] === 'COMPLETED') {
             $orderRef = $data['purchase_units'][0]['reference_id'] ?? null;
 
@@ -227,5 +230,40 @@ class Order
             mt_rand(0, 0xffff),
             mt_rand(0, 0xffff)
         );
+    }
+
+    public static function getOrderByOrderId($orderId)
+    {
+        $order = R::findOne('orders', ' order_id = ? ', bindings: [$orderId]);
+
+        if (!$order) {
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Order not found.'
+            ];
+        }
+
+        $orderLines = OrderLine::getOrderLinesByOrderId($order->id);
+
+        if ($order['status'] === 'pending' && $order['payment_method'] === 'paypal') {
+            // ✅ PayPal order ID (token) comes from query string
+            $paypalOrderId = $_GET['token'] ?? null;
+
+            if ($paypalOrderId) {
+                $paypalResponse = self::capturePayPalPayment($paypalOrderId);
+            } else {
+                $paypalResponse = [
+                    'error' => true,
+                    'message' => 'Missing PayPal order token in query string.'
+                ];
+            }
+        }
+
+        return [
+            'order'          => $order,
+            'orderLines'     => $orderLines,
+            'paypalResponse' => $paypalResponse ?? null
+        ];
     }
 }

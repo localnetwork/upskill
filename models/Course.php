@@ -10,6 +10,8 @@ require_once __DIR__ . '/../models/CourseGoal.php';
 
 require_once __DIR__ . '/../models/CourseSection.php';
 
+require_once __DIR__ . '/../models/OrderLine.php';
+
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
 use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade 
@@ -101,6 +103,49 @@ class Course
     public static function viewCourseByUUID($uuid)
     {
         $course = R::findOne('courses', 'uuid = ?', [$uuid]);
+
+
+        if (!$course) {
+            http_response_code(404); // ✅ Set actual HTTP status header
+            return [
+                'success' => false,
+                'statusCode' => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $courseGoals = CourseGoal::getCourseGoalByCourseId($course->id);
+
+        $data = [
+            'id'          => $course->id,
+            'title'       => $course->title,
+            'subtitle'    => $course->subtitle,
+            'description' => $course->description,
+            'slug'        => $course->slug,
+            'published'   => $course->published,
+            'status'      => $course->status,
+            'uuid'        => $course->uuid,
+            'created_at'  => $course->created_at,
+            'updated_at'  => $course->updated_at,
+            'author_id'   => $course->author_id,
+            'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
+            'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
+            'instructional_level' => $course->instructional_level,
+            'goals'       => $courseGoals // Include course goals 
+        ];
+
+        http_response_code(200); // ✅ OK response   
+        return [
+            'success' => true,
+            'statusCode' => 200,
+            'message' => 'Course retrieved successfully.',
+            'data' => $data
+        ];
+    }
+
+    public static function viewCourseByID($id)
+    {
+        $course = R::findOne('courses', 'id = ?', [$id]);
 
 
         if (!$course) {
@@ -487,6 +532,7 @@ class Course
                 $row['goals'] = CourseGoal::getCourseGoalByCourseId($row['id']);
                 $row['price_tier'] = $row['price_tier'] ? CoursePriceTier::getCoursePriceTierById($row['price_tier']) : null;
                 $row['is_in_cart'] = Cart::checkCourseInCart($row['id']) || false;
+                $row['is_enrolled'] = OrderLine::checkCourseEnrolled($row['id']);
             }
             unset($row);
 
@@ -533,6 +579,7 @@ class Course
         $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
         $courseArr['sections']            = CourseSection::getSectionsDataByCourseId((int) $course->id);
         $courseArr['is_in_cart']          = Cart::checkCourseInCart($course->id) || false;
+        // $courseArr['is_enrolled']       =  OrderLine::checkCourseEnrolled($course->id) || false;
         $courseArr['price_tier']         = CoursePriceTier::getCoursePriceTierById($course->price_tier);
 
         return $courseArr;
