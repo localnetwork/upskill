@@ -84,6 +84,10 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::create();
     });
 
+    $r->add('GET', $prefix . '/instructor/courses/<id>', function ($id) {
+        CourseController::instructorCourses($id);
+    });
+
     $r->add('GET', $prefix . '/courses/<id>', function ($id) {
         instructor_middleware();
         course_owner_middleware($id);

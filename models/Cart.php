@@ -14,6 +14,8 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/CourseSection.php';
 
 require_once __DIR__ . '/../models/CoursePriceTier.php';
+
+require_once __DIR__ . '/../models/OrderLine.php';
 class Cart
 {
     public static function addCart($data)
@@ -60,6 +62,17 @@ class Cart
                 'status'  => 409,
                 'errors'  => ['course_id' => 'Already in cart'],
                 'message' => 'This course is already in your cart.',
+            ];
+        }
+
+        $is_enrolled = OrderLine::checkCourseEnrolled($data['course_id']);
+
+        if ($is_enrolled) {
+            return [
+                'error'   => true,
+                'status'  => 409,
+                'errors'  => ['course_id' => 'Already enrolled'],
+                'message' => 'You are already enrolled in this course.',
             ];
         }
 

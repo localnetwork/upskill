@@ -241,7 +241,7 @@ class Course
         $validation = $validator->make($data, [
             'title'               => 'required|min:3|max:60',
             'subtitle'            => 'max:255',
-            'description'         => 'min:200|max:5000',
+            'description'         => 'min:200|max:10000',
             'instructional_level' => 'numeric', // optional numeric FK
         ]);
         $validation->validate();
@@ -581,7 +581,83 @@ class Course
         $courseArr['is_in_cart']          = Cart::checkCourseInCart($course->id) || false;
         // $courseArr['is_enrolled']       =  OrderLine::checkCourseEnrolled($course->id) || false;
         $courseArr['price_tier']         = CoursePriceTier::getCoursePriceTierById($course->price_tier);
+        $courseArr['is_enrolled']        = OrderLine::checkCourseEnrolled($course->id);
 
         return $courseArr;
+    }
+
+    public static function getInstructorCourses($instructorId, $page = 1, $perPage = 10, $filters = [])
+    {
+        try {
+            $page    = max(1, (int)$page);
+            $perPage = max(1, (int)$perPage);
+            $offset  = ($page - 1) * $perPage;
+
+            // Build where conditions dynamically 
+            $conditions = ['published = 1'];
+            $params     = [];
+
+            if (!empty($filters['title'])) {
+                $conditions[] = 'title LIKE ?';
+                $params[] = '%' . $filters['title'] . '%';
+            }
+
+            if (!empty($filters['instructional_level'])) {
+                $conditions[] = 'instructional_level = ?';
+                $params[] = (int)$filters['instructional_level'];
+            }
+
+            if (!empty($instructorId)) {
+                $conditions[] = 'author_id = ?';
+                $params[] = (int)$instructorId;
+            }
+
+            $whereClause = 'WHERE ' . implode(' AND ', $conditions);
+
+            // Total courses for pagination
+            $totalCourses = R::count('courses', implode(' AND ', $conditions), $params);
+
+            // Build SQL
+            $limit  = (int) $perPage;
+            $offsetVal = (int) $offset;
+            $sql = "$whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offsetVal";
+
+            // Fetch paginated courses
+            $courses = R::findAll('courses', $sql, $params);
+
+            // Export beans to arrays
+            $courseData = R::exportAll($courses);
+
+            // Attach section counts   
+            foreach ($courseData as &$row) {
+                $row['author'] = User::getPublicProfileById($row['author_id']);
+                $row['cover_image'] = Media::getMediaById($row['cover_image']);
+                $row['instructional_level'] = CourseLevel::getCourseLevelById($row['instructional_level']);
+                $row['resources_count'] = CourseSection::getCourseSectionCount((int)$row['id']);
+                $row['goals'] = CourseGoal::getCourseGoalByCourseId($row['id']);
+                $row['price_tier'] = $row['price_tier'] ? CoursePriceTier::getCoursePriceTierById($row['price_tier']) : null;
+                $row['is_in_cart'] = Cart::checkCourseInCart($row['id']) || false;
+                $row['is_enrolled'] = OrderLine::checkCourseEnrolled($row['id']);
+            }
+            unset($row);
+
+            return [
+                'error' => false,
+                'message' => 'Courses retrieved successfully.',
+                'meta' => [
+                    'page'       => $page,
+                    'perPage'    => $perPage,
+                    'total'      => (int)$totalCourses,
+                    'totalPages' => ($perPage > 0 ? (int)ceil($totalCourses / $perPage) : 1),
+                ],
+                'data' => $courseData,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error'   => true,
+                'status'  => 500,
+                'message' => 'Database error: ' . $e->getMessage(),
+            ];
+        }
     }
 }

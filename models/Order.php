@@ -10,6 +10,8 @@ require_once __DIR__ . '/../models/Course.php';
 
 require_once __DIR__ . '/../models/OrderLine.php';
 
+require_once __DIR__ . '/../controllers/AuthController.php';
+
 class Order
 {
     public static function createOrder($userId, $paymentMethod)
@@ -163,20 +165,21 @@ class Order
         $sandbox = env('PAYPAL_SANDBOX') === 'true';
         $baseUrl = $sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
 
-        // Step 1: Get Access
+        // Step 1: Get Access Token
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
         curl_setopt($ch, CURLOPT_USERPWD, "$clientId:$secret");
         curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
-        $token = json_decode($response, true)['access_token'] ?? null;
         curl_close($ch);
 
+        $token = json_decode($response, true)['access_token'] ?? null;
         if (!$token) {
             return [
                 'error' => true,
-                'message' => 'Failed to get access token.',
+                'message' => 'Failed to get PayPal access token.',
+                'raw_response' => $response
             ];
         }
 
@@ -194,28 +197,54 @@ class Order
 
         $data = json_decode($response, true);
 
-        // Step 3: If payment is completed, update DB  
-        if (isset($data['status']) && $data['status'] === 'COMPLETED') {
-            $orderRef = $data['purchase_units'][0]['reference_id'] ?? null;
+        // Step 3: Handle possible statuses
+        $orderRef = $data['purchase_units'][0]['reference_id'] ?? null;
+        $status = $data['status'] ?? null;
+        $captureStatus = $data['purchase_units'][0]['payments']['captures'][0]['status'] ?? null;
 
+        // ✅ Completed payment
+        if ($status === 'COMPLETED' || $captureStatus === 'COMPLETED') {
             if ($orderRef) {
-                // ✅ Update the order status to 'completed'
                 R::exec('UPDATE orders SET status = ? WHERE order_id = ?', ['completed', $orderRef]);
-
-                return [
-                    'error' => false,
-                    'message' => 'Payment successful. Order marked as completed.',
-                    'data' => $data
-                ];
             }
+
+            return [
+                'error' => false,
+                'message' => 'Payment completed successfully.',
+                'data' => $data
+            ];
         }
 
+        // ⚠️ Cancelled or voided payment
+        if (in_array($status, ['CANCELLED', 'VOIDED']) || in_array($captureStatus, ['CANCELLED', 'VOIDED'])) {
+            if ($orderRef) {
+                R::exec('UPDATE orders SET status = ? WHERE order_id = ?', ['cancelled', $orderRef]);
+            }
+
+            return [
+                'error' => true,
+                'message' => 'Payment was cancelled or voided by PayPal.',
+                'data' => $data
+            ];
+        }
+
+        // ⏳ Payment requires payer action or is pending
+        if (in_array($status, ['PAYER_ACTION_REQUIRED', 'PENDING']) || in_array($captureStatus, ['PENDING'])) {
+            return [
+                'error' => true,
+                'message' => 'Payment is still pending or requires action from payer.',
+                'data' => $data
+            ];
+        }
+
+        // ❌ Default: unknown or failed 
         return [
             'error' => true,
-            'message' => 'Payment not completed.',
+            'message' => 'Payment not completed or failed.',
             'data' => $data
         ];
     }
+
 
     private static function generateUUID()
     {
@@ -234,6 +263,8 @@ class Order
 
     public static function getOrderByOrderId($orderId)
     {
+
+
         $order = R::findOne('orders', ' order_id = ? ', bindings: [$orderId]);
 
         if (!$order) {
@@ -243,6 +274,8 @@ class Order
                 'message' => 'Order not found.'
             ];
         }
+
+
 
         $orderLines = OrderLine::getOrderLinesByOrderId($order->id);
 
@@ -259,11 +292,22 @@ class Order
                 ];
             }
         }
+        // $currentUser = AuthController::getCurrentUser();
+
+        // if ((int)$currentUser->user->id !== (int)$order['user_id']) {
+        //     return [
+        //         'error'   => true,
+        //         'status'  => 403,
+        //         'message' => 'You do not have permission to view this order.'
+        //     ];
+        // }
+
 
         return [
             'order'          => $order,
             'orderLines'     => $orderLines,
-            'paypalResponse' => $paypalResponse ?? null
+            'paypalResponse' => $paypalResponse ?? null,
+            'test' => $order['user_id'],
         ];
     }
 }
