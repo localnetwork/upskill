@@ -215,6 +215,14 @@ $router->group('/api', function ($r, $prefix) {
     $r->add('GET', $prefix . '/orders/<id>', function ($id) {
         OrderController::show($id);
     });
+
+    $r->add('POST', $prefix . '/orders/<id>/cancel', function ($id) {
+        OrderController::cancel($id);
+    });
+
+    $r->add('GET', $prefix . '/learnings', function () {
+        OrderController::learnings();
+    });
 });
 
 // ✅ Dispatch request

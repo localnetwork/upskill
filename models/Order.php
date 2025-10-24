@@ -14,6 +14,14 @@ require_once __DIR__ . '/../controllers/AuthController.php';
 
 class Order
 {
+    /**
+     * Helper function to standardize API responses.
+     */
+    private static function response($error, $status, $message)
+    {
+        return compact('error', 'status', 'message');
+    }
+
     public static function createOrder($userId, $paymentMethod)
     {
         if (empty($userId) || !is_numeric($userId)) {
@@ -68,8 +76,8 @@ class Order
         $order->total_amount = $totalAmount;
         R::store($order);
 
-        // ✅ Clear cart
-        R::exec('DELETE FROM carts WHERE user_id = ?', [$userId]);
+        // // ✅ Clear cart
+        // R::exec('DELETE FROM carts WHERE user_id = ?', [$userId]);
 
         return [
             'error' => false,
@@ -206,6 +214,7 @@ class Order
         if ($status === 'COMPLETED' || $captureStatus === 'COMPLETED') {
             if ($orderRef) {
                 R::exec('UPDATE orders SET status = ? WHERE order_id = ?', ['completed', $orderRef]);
+                R::exec('DELETE FROM carts WHERE user_id = (SELECT user_id FROM orders WHERE order_id = ?)', [$orderRef]);
             }
 
             return [
@@ -275,8 +284,6 @@ class Order
             ];
         }
 
-
-
         $orderLines = OrderLine::getOrderLinesByOrderId($order->id);
 
         if ($order['status'] === 'pending' && $order['payment_method'] === 'paypal') {
@@ -292,22 +299,101 @@ class Order
                 ];
             }
         }
-        // $currentUser = AuthController::getCurrentUser();
+        $currentUser = AuthController::getCurrentUser();
 
-        // if ((int)$currentUser->user->id !== (int)$order['user_id']) {
-        //     return [
-        //         'error'   => true,
-        //         'status'  => 403,
-        //         'message' => 'You do not have permission to view this order.'
-        //     ];
-        // }
-
+        if ($order['user_id'] === $currentUser->user->id) {
+            return [
+                'order'          => $order,
+                'orderLines'     => $orderLines,
+                'paypalResponse' => $paypalResponse ?? null,
+                'test' => $order['user_id'],
+                'currentUser' => $currentUser->user->id
+            ];
+        }
 
         return [
-            'order'          => $order,
-            'orderLines'     => $orderLines,
-            'paypalResponse' => $paypalResponse ?? null,
-            'test' => $order['user_id'],
+            'error'   => true,
+            'status'  => 403,
+            'message' => 'You do not have permission to view this order.'
+        ];
+    }
+
+    public static function cancelOrder($orderId)
+    {
+        $order = R::findOne('orders', 'order_id = ?', [$orderId]);
+        if (!$order) {
+            return self::response(true, 404, 'Order not found.');
+        }
+
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser || $order->user_id != $currentUser->user->id) {
+            return self::response(true, 403, 'You do not have permission to cancel this order.');
+        }
+
+        switch ($order->status) {
+            case 'completed':
+                return self::response(true, 400, 'Completed orders cannot be cancelled.');
+
+            case 'cancelled':
+                return self::response(false, 200, 'Order is already cancelled.');
+
+            default:
+                $order->status = 'cancelled';
+                // R::store($order);
+
+        }
+        R::exec('DELETE FROM orders WHERE order_id = ?', [$orderId]);
+        return self::response(false, 200, 'Order cancelled successfully.');
+    }
+    public static function getOrders()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser) {
+            return self::response(true, 401, 'Unauthorized.');
+        }
+
+        $orders = R::find('orders', 'user_id = ?', [$currentUser->user->id]);
+        $orderList = [];
+        foreach ($orders as $order) {
+            $orderLines = OrderLine::getOrderLinesByOrderId($order->id);
+            $orderList[] = [
+                'order' => $order,
+                'orderLines' => $orderLines
+            ];
+        }
+
+        return [
+            'error' => false,
+            'status' => 200,
+            'data' => $orderList,
+            'message' => 'Orders retrieved successfully.'
+        ];
+    }
+
+    public static function getLearning()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser) {
+            return self::response(true, 401, 'Unauthorized.');
+        }
+
+        $orders = R::find('orders', 'user_id = ? AND status = ?', [$currentUser->user->id, 'completed']);
+        $learningCourses = [];
+        foreach ($orders as $order) {
+            $orderLines = OrderLine::getOrderLinesByOrderId($order->id);
+
+            foreach ($orderLines as $line) {
+                unset($line['course']['data']['description']);
+                unset($line['course']['data']['price_tier']);
+                $learningCourses[] = $line; // or use array_push($learningCourses, $line);
+            }
+        }
+
+        return [
+            'error' => false,
+            'status' => 200,
+            'data' => $learningCourses,
+            'message' => 'Learning courses retrieved successfully.'
         ];
     }
 }

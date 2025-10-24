@@ -36,4 +36,30 @@ class OrderController
         header('Content-Type: application/json');
         echo json_encode($response);
     }
+
+    public static function cancel($orderId)
+    {
+        $response = Order::cancelOrder($orderId);
+
+        // Enforce the HTTP status code if it's included in the response
+        if (isset($response['status'])) {
+            http_response_code($response['status']);
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode($response);
+    }
+
+    public static function learnings()
+    {
+        $response = Order::getLearning();
+
+        // Enforce the HTTP status code if it's included in the response
+        if (isset($response['status'])) {
+            http_response_code($response['status']);
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode($response);
+    }
 }

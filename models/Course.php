@@ -171,6 +171,7 @@ class Course
             'created_at'  => $course->created_at,
             'updated_at'  => $course->updated_at,
             'author_id'   => $course->author_id,
+            'author'      => User::getPublicProfileById($course->author_id),
             'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
             'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
             'instructional_level' => $course->instructional_level,
