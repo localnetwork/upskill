@@ -130,4 +130,20 @@ class CourseController
         header('Content-Type: application/json');
         echo json_encode($result);
     }
+
+    public static function learn($slug)
+    {
+        $result = Course::learnCourse($slug);
+
+        if (!empty($result['error'])) {
+            http_response_code($result['status'] ?? 500);
+            echo json_encode([
+                'message' => $result['message'] ?? 'An error occurred.',
+                'errors'  => $result['errors'] ?? null,
+            ]);
+            return;
+        }
+
+        echo json_encode($result);
+    }
 }

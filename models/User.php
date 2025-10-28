@@ -16,7 +16,7 @@ class User
     // Just declare – no default here!
     protected static string $jwt_key;
 
-    /**
+    /** 
      * Return the JWT key from cache or from .env
      */
     protected static function jwtKey(): string

@@ -661,4 +661,41 @@ class Course
             ];
         }
     }
+
+    public static function learnCourse($slug)
+    {
+        $course = R::findOne('courses', 'slug = ?', [$slug]);
+        if (!$course) {
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $courseId = $course->id;
+
+        $is_enrolled = OrderLine::checkCourseEnrolled($courseId);
+
+        if (!$is_enrolled) {
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'You are not enrolled in this course.'
+            ];
+        }
+
+
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'message' => 'Access granted to learn the course.',
+            'data'    => [
+                'course' => [
+                    ...$course->export(),
+                    'sections' => CourseSection::getSectionsDataByCourseId((int) $course->id, $showAsset = true)
+                ]
+            ]
+        ];
+    }
 }

@@ -109,6 +109,11 @@ $router->group('/api', function ($r, $prefix) {
         CourseGoalController::updateCourseGoal(id: $id);
     });
 
+    $r->add('GET', $prefix . '/courses/<id>/learn', function ($id) {
+        jwt_middleware();
+        CourseController::learn($id);
+    });
+
     // ==================== COURSE SECTION ROUTES ====================
     $r->add('POST', $prefix . '/course-sections', function () {
         CourseSectionController::createSection();

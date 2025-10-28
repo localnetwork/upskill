@@ -98,7 +98,7 @@ class CourseSection
         return $sections;
     }
 
-    public static function getSectionsDataByCourseId(int $courseId)
+    public static function getSectionsDataByCourseId(int $courseId, $showAsset = false)
     {
         $sectionsCollection = R::findAll(
             'course_sections',
@@ -106,12 +106,12 @@ class CourseSection
             [$courseId]
         );
 
-        // Convert to array
+        // Convert to array 
         $sections = R::exportAll($sectionsCollection);
 
         // ✅ Pass all section IDs to fetch their curriculums
         $sectionIds = array_column($sections, 'id');
-        $curriculums = CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds);
+        $curriculums = CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds, $showAsset);
 
         // Attach curriculums to each section for easy use 
         foreach ($sections as &$section) {

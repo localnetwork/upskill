@@ -161,7 +161,7 @@ class CourseCurriculum
         }
     }
 
-    public static function getCurriculumsDataBySectionIds(array $sectionIds)
+    public static function getCurriculumsDataBySectionIds(array $sectionIds, $showAsset = false)
     {
         if (empty($sectionIds)) {
             return [];
@@ -172,7 +172,7 @@ class CourseCurriculum
 
             $rows = R::getAll(
                 "SELECT * FROM course_curriculums  
-             WHERE course_section_id IN ($placeholders)
+             WHERE course_section_id IN ($placeholders) 
              ORDER BY sort_order ASC, created_at ASC",
                 $sectionIds
             );
@@ -185,6 +185,12 @@ class CourseCurriculum
                     $grouped[$sectionId] = [];
                 }
                 $grouped[$sectionId][] = $row;
+                if ($showAsset) {
+                    $grouped[$sectionId] = array_map(
+                        [self::class, '_attachResourceData'],
+                        $grouped[$sectionId]
+                    );
+                }
             }
 
             return $grouped;

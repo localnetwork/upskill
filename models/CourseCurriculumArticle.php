@@ -13,6 +13,9 @@ require_once __DIR__ . '/../models/CourseCurriculum.php';
 use Ramsey\Uuid\Uuid;
 use RedBeanPHP\R;
 
+use HTMLPurifier;
+use HTMLPurifier_Config;
+
 
 
 class CourseCurriculumArticle
@@ -46,6 +49,16 @@ class CourseCurriculumArticle
             ];
         }
 
+        // 🔹 Sanitize TinyMCE content
+        $config = \HTMLPurifier_Config::createDefault();
+        $config->set('HTML.Allowed', 'p,h1,h2,h3,h4,h5,h6,span,strong,b,i,u,em,a[href|target],ul,ol,li,blockquote,br');
+        $config->set('HTML.Nofollow', true);
+        $config->set('Attr.AllowedFrameTargets', ['_blank']);
+        $purifier = new \HTMLPurifier($config);
+
+        // Purify content (remove <div>, <script>, etc.)
+        $cleanContent = $purifier->purify($data['content']);
+
         // 🔹 Always set curriculum resource type to article
         R::exec(
             'UPDATE course_curriculums SET curriculum_resource_type = ? WHERE id = ?',
@@ -56,13 +69,12 @@ class CourseCurriculumArticle
         $existingArticle = R::findOne('course_curriculum_articles', 'curriculum_id = ?', [$data['curriculum_id']]);
 
         if ($existingArticle) {
-            // Update existing record
             R::exec(
                 'UPDATE course_curriculum_articles 
              SET content = ?, author_id = ?, updated_at = ? 
              WHERE curriculum_id = ?',
                 [
-                    $data['content'],
+                    $cleanContent,
                     $currentUser->user->id,
                     R::isoDateTime(),
                     $data['curriculum_id']
@@ -72,14 +84,13 @@ class CourseCurriculumArticle
             $message = 'Article updated successfully.';
             $status  = 200;
         } else {
-            // Insert new record
             R::exec(
                 'INSERT INTO course_curriculum_articles 
             (uuid, content, author_id, curriculum_id, created_at, updated_at) 
             VALUES (?,?,?,?,?,?)',
                 [
                     Uuid::uuid4()->toString(),
-                    $data['content'],
+                    $cleanContent,
                     $currentUser->user->id,
                     $data['curriculum_id'],
                     R::isoDateTime(),
@@ -97,13 +108,14 @@ class CourseCurriculumArticle
             'data'    => [
                 'curriculum' => CourseCurriculum::getCurriculumById($data['curriculum_id']),
                 'asset' => [
-                    'content'       => $data['content'],
+                    'content'       => $cleanContent,
                     'author_id'     => $currentUser->user->id,
                     'curriculum_id' => $data['curriculum_id'],
                 ]
             ]
         ];
     }
+
 
 
     public static function getArticleByCurriculumId($id)
