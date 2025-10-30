@@ -693,6 +693,9 @@ class Course
             'data'    => [
                 'course' => [
                     ...$course->export(),
+                    'author'              => User::getPublicProfileById($course->author_id),
+                    'resources_count'     => CourseSection::getCourseSectionCount((int) $course->id),
+                    'instructional_level' => CourseLevel::getCourseLevelById($course->instructional_level),
                     'sections' => CourseSection::getSectionsDataByCourseId((int) $course->id, $showAsset = true)
                 ]
             ]

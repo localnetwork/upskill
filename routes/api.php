@@ -26,7 +26,7 @@ $router->add('GET', '/', function () {
     echo json_encode(['message' => 'Upskill Management API']);
 });
 
-// ✅ Grouped API routes
+// ✅ Grouped API routes 
 $router->group('/api', function ($r, $prefix) {
 
     // ==================== PUBLIC ROUTES ====================
@@ -184,7 +184,8 @@ $router->group('/api', function ($r, $prefix) {
 
     // ==================== MEDIA ROUTES ====================
     $r->add('POST', $prefix . '/media', function () {
-        instructor_middleware();
+        // instructor_middleware();
+        jwt_middleware();
         MediaController::create();
     });
 
