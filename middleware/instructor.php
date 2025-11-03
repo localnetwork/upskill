@@ -31,10 +31,11 @@ function instructor_middleware()
 
         // ✅ Check if user has the required role
         $roles = $decoded->user->roles ?? [];
+
         $hasInstructor = false;
 
         foreach ($roles as $role) {
-            if (strcasecmp($role->name, 'Instructor') === 0) {
+            if (strcasecmp($role->role_name, 'Instructor') === 0 || $role->id == 2) {
                 $hasInstructor = true;
                 break;
             }

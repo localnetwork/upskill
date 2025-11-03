@@ -42,27 +42,40 @@ class OrderLine
 
     public static function checkCourseEnrolled($courseId)
     {
+        // ✅ Get current logged-in user
         $currentUser = AuthController::getCurrentUser(true);
+
+        // ✅ Handle missing or invalid user
         if (!$currentUser) {
             return false;
         }
 
-        $sql = '
-        SELECT ol.*
-        FROM order_lines ol
-        JOIN orders o ON ol.order_id = o.id
-        WHERE ol.course_id = ? 
-          AND o.user_id = ? 
-          AND o.status = ?
-        LIMIT 1
-    ';
+        // ✅ Normalize user ID (support both object or nested property)
+        $userId = null;
+        if (is_object($currentUser)) {
+            $userId = $currentUser->user->id ?? $currentUser->id ?? null;
+        } elseif (is_array($currentUser)) {
+            $userId = $currentUser['user']['id'] ?? $currentUser['id'] ?? null;
+        }
 
-        $orderLine = R::getRow($sql, [
-            $courseId,
-            $currentUser->user->id,
-            'completed'
+        if (!$userId) {
+            return false;
+        }
+
+        // ✅ Use COUNT for efficient existence check
+        $count = R::count('order_lines', '
+        course_id = ? 
+        AND order_id IN (
+            SELECT id FROM orders 
+            WHERE user_id = ? AND status = ?
+        )
+    ', [
+            (int)$courseId,
+            (int)$userId,
+            'completed',
         ]);
 
-        return !empty($orderLine);
+        // ✅ Return true if at least one record found
+        return $count > 0;
     }
 }

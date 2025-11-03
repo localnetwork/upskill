@@ -181,7 +181,7 @@ class User
 
         if ($user && password_verify($password, $user->password)) {
 
-            $roles = getUserRoles($user->id);
+            $roles = UserRole::getUserRoles($user->id);
 
             $payload = [
                 'user'   => [
