@@ -66,7 +66,7 @@ class Media
         $fileSize = filesize($destination);
 
         // ✅ Store media record in the **medias** table
-        $media = R::dispense('medias');
+        $media = R::dispense('media');
         $media->title       = $title;
         $media->description = $description;
         $media->path        = '/assets/images/' . $uniqueName;
@@ -93,7 +93,7 @@ class Media
 
     public static function getMediaById($id)
     {
-        $media = R::findOne('medias', 'id = ?', [$id]);
+        $media = R::findOne('media', 'id = ?', [$id]);
         if (!$media) {
             return null;
         }

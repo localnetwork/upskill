@@ -45,12 +45,12 @@ class OrderLine
         // ✅ Get current logged-in user
         $currentUser = AuthController::getCurrentUser(true);
 
-        // ✅ Handle missing or invalid user
+        // ✅ Handle missing or invalid user  
         if (!$currentUser) {
             return false;
         }
 
-        // ✅ Normalize user ID (support both object or nested property)
+        // ✅ Normalize user ID (support both object or nested property) 
         $userId = null;
         if (is_object($currentUser)) {
             $userId = $currentUser->user->id ?? $currentUser->id ?? null;

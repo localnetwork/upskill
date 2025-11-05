@@ -1,13 +1,15 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
+
 use RedBeanPHP\R;
+
 require_once __DIR__ . '/config/env.php';
 require_once __DIR__ . '/lib/helper.php';
 
 // ✅ Use env() helper for DB
 $host = env('DB_HOST', 'localhost');
 $db   = env('DB_NAME', 'upskill');
-$user = env('DB_USER', 'root'); 
+$user = env('DB_USER', 'root');
 $pass = env('DB_PASS', '');
 $port = env('DB_PORT', '3390');
 
@@ -16,7 +18,8 @@ R::setup("mysql:host=$host;port=$port;dbname=$db", $user, $pass);
 R::freeze(false);
 
 // ✅ Convert CamelCase → snake_case
-function camelToSnake(string $input): string {
+function camelToSnake(string $input): string
+{
     return strtolower(preg_replace('/([a-z])([A-Z])/', '$1_$2', $input));
 }
 
@@ -27,8 +30,23 @@ $schemaDir = __DIR__ . '/schemas';
 $schemas = [];
 foreach (glob($schemaDir . '/*Schema.php') as $file) {
     $base      = basename($file, 'Schema.php');  // e.g. UserProfile
-    $tableName = camelToSnake($base) . 's';      // → user_profile + s
     $schema    = require $file;
+
+    // Check if schema wants plural table name (default: true)
+    $isPlural = $schema['_isPlural'] ?? true;
+
+    // Convert to snake_case and optionally pluralize
+    $tableName = camelToSnake($base);
+    if ($isPlural) {
+        // Simple pluralization (add 's', or 'es' for words ending in 's', 'x', 'z', 'ch', 'sh')
+        if (preg_match('/(s|x|z|ch|sh)$/', $tableName)) {
+            $tableName .= 'es';
+        } elseif (preg_match('/y$/', $tableName)) {
+            $tableName = substr($tableName, 0, -1) . 'ies';
+        } else {
+            $tableName .= 's';
+        }
+    }
 
     // use _weight if present, otherwise default to 100 (migrate last)
     $weight = $schema['_weight'] ?? 100;
@@ -51,4 +69,3 @@ foreach ($schemas as $item) {
 }
 
 echo "✅ All migrations complete.\n";
- 

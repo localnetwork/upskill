@@ -20,6 +20,6 @@ return [
     'verified' => 'BOOLEAN DEFAULT FALSE',
     'status'   => 'TINYINT(1) DEFAULT 1',
     '_foreign' => [
-        'fk_user_picture' => 'FOREIGN KEY (user_picture) REFERENCES medias(id) ON DELETE CASCADE',
+        'fk_user_picture' => 'FOREIGN KEY (user_picture) REFERENCES media(id) ON DELETE CASCADE',
     ]
 ];

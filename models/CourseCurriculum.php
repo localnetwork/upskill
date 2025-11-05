@@ -161,8 +161,11 @@ class CourseCurriculum
         }
     }
 
-    public static function getCurriculumsDataBySectionIds(array $sectionIds, $showAsset = false)
+    public static function getCurriculumsDataBySectionIds(array $sectionIds, $showAsset = false, $requireUser = true)
     {
+        // Optionally load current user
+        $currentUser = $requireUser ? AuthController::getCurrentUser(true) : null;
+
         if (empty($sectionIds)) {
             return [];
         }
@@ -181,16 +184,31 @@ class CourseCurriculum
             $grouped = [];
             foreach ($rows as $row) {
                 $sectionId = $row['course_section_id'];
+
+                // Optional isTaken check only if user exists
+                $isTaken = false;
+                if ($currentUser && isset($currentUser->user->id)) {
+                    $isTaken = R::getCell(
+                        'SELECT COUNT(*) FROM curriculum_progress 
+                     WHERE curriculum_id = ? AND author_id = ?',
+                        [
+                            $row['id'],
+                            $currentUser->user->id
+                        ]
+                    ) > 0;
+                }
+
                 if (!isset($grouped[$sectionId])) {
                     $grouped[$sectionId] = [];
                 }
-                $grouped[$sectionId][] = $row;
+
+                $row['is_taken'] = $isTaken;
+
                 if ($showAsset) {
-                    $grouped[$sectionId] = array_map(
-                        [self::class, '_attachResourceData'],
-                        $grouped[$sectionId]
-                    );
+                    $row = self::_attachResourceData($row);
                 }
+
+                $grouped[$sectionId][] = $row;
             }
 
             return $grouped;
@@ -202,6 +220,7 @@ class CourseCurriculum
             ];
         }
     }
+
 
 
     public static function getCurriculumsBySectionId(int $sectionId)
@@ -337,8 +356,6 @@ class CourseCurriculum
                 'message' => 'Please check the validated fields.'
             ];
         }
-
-        // TODO: implement update logic here if needed
     }
 
     public static function getCurriculumById($id)

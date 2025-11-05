@@ -19,6 +19,8 @@ require_once __DIR__ . '/../controllers/CartController.php';
 require_once __DIR__ . '/../controllers/CoursePriceTierController.php';
 require_once __DIR__ . '/../controllers/CheckoutController.php';
 require_once __DIR__ . '/../controllers/OrderController.php';
+require_once __DIR__ . '/../controllers/CurriculumProgressController.php';
+
 
 $router = new Router();
 
@@ -142,6 +144,11 @@ $router->group('/api', function ($r, $prefix) {
     // ==================== COURSE CURRICULUM ROUTES ====================
     $r->add('POST', $prefix . '/course-curriculums', function () {
         CourseCurriculumController::createCurriculum();
+    });
+
+    $r->add('POST', $prefix . '/course-curriculums/add-progress', function () {
+        jwt_middleware();
+        CurriculumProgressController::addProgress();
     });
 
     $r->add('GET', $prefix . '/course-curriculums/<id>', function ($id) {

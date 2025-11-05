@@ -100,6 +100,8 @@ class CourseSection
 
     public static function getSectionsDataByCourseId(int $courseId, $showAsset = false)
     {
+        $currentUser = AuthController::getCurrentUser(true);
+
         $sectionsCollection = R::findAll(
             'course_sections',
             'course_id = ? ORDER BY created_at ASC',
@@ -111,7 +113,7 @@ class CourseSection
 
         // ✅ Pass all section IDs to fetch their curriculums
         $sectionIds = array_column($sections, 'id');
-        $curriculums = CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds, $showAsset);
+        $curriculums = $currentUser ? CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds, $showAsset) : CourseCurriculum::getCurriculumsDataBySectionIds($sectionIds);
 
         // Attach curriculums to each section for easy use 
         foreach ($sections as &$section) {

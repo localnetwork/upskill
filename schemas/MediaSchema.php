@@ -1,5 +1,6 @@
 <?php
 return [
+    '_isPlural' => false,
     '_weight' => 25,
     'title' => 'VARCHAR(255) NOT NULL',
     "path" => "VARCHAR(255) NOT NULL",

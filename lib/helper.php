@@ -19,7 +19,8 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
     $foreigns = $schema['_foreign'] ?? [];
 
     foreach ($schema as $name => $type) {
-        if (in_array($name, ['_weight', '_indexes', '_foreign'], true)) continue;
+        // Skip all meta keys including _isPlural
+        if (in_array($name, ['_weight', '_isPlural', '_indexes', '_foreign'], true)) continue;
         $columns[$name] = $type;
     }
 
@@ -87,18 +88,18 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
         WHERE TABLE_SCHEMA = DATABASE() 
         AND TABLE_NAME = ? 
         AND COLUMN_NAME = 'uuid'
-        AND NON_UNIQUE = 1
+        AND NON_UNIQUE = 0
     ");
     $uuidIndexCheck->execute([$table]);
-    if ($uuidIndexCheck->fetchColumn()) {
+    if (!$uuidIndexCheck->fetchColumn()) {
         $pdo->exec("CREATE UNIQUE INDEX idx_{$table}_uuid ON `$table`(uuid)");
         echo "➕ Added unique index on uuid for {$table}\n";
     }
 
-    // Add indexes and foreign keys (same as before)
+    // Add indexes
     foreach ($indexes as $name => $def) {
         $def = trim($def);
-        if ($def === '') continue;
+        if ($def === '') continue; // Skip empty definitions
 
         $check = $pdo->prepare("
             SELECT COUNT(*) 
@@ -111,16 +112,21 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
         $exists = $check->fetchColumn();
 
         if (!$exists) {
-            $pdo->exec("ALTER TABLE `$table` ADD $def");
-            echo "➕ Added index $name on {$table}\n";
+            try {
+                $pdo->exec("ALTER TABLE `$table` ADD $def");
+                echo "➕ Added index $name on {$table}\n";
+            } catch (PDOException $e) {
+                echo "❌ Failed to add index $name on {$table}: " . $e->getMessage() . "\n";
+            }
         } else {
             echo "⚠️ Skipped existing index $name on {$table}\n";
         }
     }
 
+    // Add foreign keys
     foreach ($foreigns as $name => $def) {
         $def = trim($def);
-        if ($def === '') continue;
+        if ($def === '') continue; // Skip empty definitions
 
         if (!preg_match('/FOREIGN KEY\s*\((.*?)\)\s*REFERENCES\s*(\w+)\((.*?)\)/i', $def, $matches)) {
             echo "⚠️ Invalid foreign key definition `$name` on {$table}, skipping.\n";
@@ -160,7 +166,6 @@ function createTableFromSchema(PDO $pdo, string $table, array $schema): void
         }
     }
 }
-
 
 function orderIdGenerator($length = 10)
 {
