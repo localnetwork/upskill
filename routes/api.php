@@ -100,9 +100,19 @@ $router->group('/api', function ($r, $prefix) {
         CourseController::updateCourseByUuid(uuid: $id);
     });
 
+    $r->add('PUT', $prefix . '/courses/<id>/unpublish', function ($id) {
+        instructor_middleware();
+        CourseController::unpublishCourse(uuid: $id);
+    });
+
     $r->add('PUT', $prefix . '/courses/<id>/pricing', function ($id) {
         instructor_middleware();
         CourseController::updateCoursePriceByUuid(uuid: $id);
+    });
+
+    $r->add('POST', $prefix . '/courses/<id>/promo-video', function () {
+        instructor_middleware();
+        CourseController::uploadPromotionalVideo();
     });
 
 

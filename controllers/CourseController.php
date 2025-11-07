@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/../models/Course.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
+
+use RedBeanPHP\R;
+
 class CourseController
 {
     // Controller methods here
@@ -134,6 +137,39 @@ class CourseController
     public static function learn($slug)
     {
         $result = Course::learnCourse($slug);
+
+        if (!empty($result['error'])) {
+            http_response_code($result['status'] ?? 500);
+            echo json_encode([
+                'message' => $result['message'] ?? 'An error occurred.',
+                'errors'  => $result['errors'] ?? null,
+            ]);
+            return;
+        }
+
+        echo json_encode($result);
+    }
+
+    public static function uploadPromotionalVideo()
+    {
+        $result = Course::uploadPromoVideo($_POST);
+
+        if (!empty($result['error'])) {
+            http_response_code($result['status'] ?? 500);
+            echo json_encode([
+                'errors'  => $result['errors'] ?? null,
+                'message' => $result['message'] ?? 'An error occurred.'
+            ]);
+            return;
+        }
+
+        http_response_code($result['status'] ?? 200);
+        echo json_encode($result);
+    }
+
+    public static function unpublishCourse($uuid)
+    {
+        $result = Course::unpublish($uuid);
 
         if (!empty($result['error'])) {
             http_response_code($result['status'] ?? 500);

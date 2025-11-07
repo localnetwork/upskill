@@ -28,67 +28,157 @@ class Media
 
     public static function createMedia($data, $file)
     {
-        // ✅ Get the authenticated user
+        // Validate user authentication
+        $currentUser = self::validateUserAuthentication();
+
+        // Validate and sanitize input data
+        $title = $data['title'] ?? null;
+        $description = $data['description'] ?? null;
+
+        // Validate file upload
+        self::validateFileUpload($file);
+
+        // Process and store the file
+        $fileInfo = self::processFileUpload($file);
+
+        // Create media record
+        $mediaData = self::createMediaRecord($title, $description, $fileInfo, $currentUser->user->id);
+
+        return $mediaData;
+    }
+
+    /**
+     * Validate user authentication
+     * @throws \Exception if user is not authenticated
+     */
+    private static function validateUserAuthentication()
+    {
         $currentUser = AuthController::getCurrentUser();
+
         if (!$currentUser || !isset($currentUser->user->id)) {
             throw new \Exception('Unauthorized. User not found.');
         }
 
-        // ✅ Ensure $data is always an array
-        $title       = isset($data['title']) ? $data['title'] : null;
-        $description = isset($data['description']) ? $data['description'] : null;
+        return $currentUser;
+    }
 
-        // ✅ Check if a file was uploaded
+    /**
+     * Validate file upload
+     * @throws \Exception if file is invalid
+     */
+    private static function validateFileUpload($file)
+    {
         if (!isset($file['tmp_name']) || $file['error'] !== UPLOAD_ERR_OK) {
             throw new \Exception('No valid file uploaded');
         }
 
-        // ✅ Directory to store images
-        $uploadDir = __DIR__ . '/../assets/images/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+        // Optional: Add file size and type validation
+        $maxFileSize = 10 * 1024 * 1024; // 10MB
+        if ($file['size'] > $maxFileSize) {
+            throw new \Exception('File size exceeds maximum allowed size');
         }
 
-        // ✅ Create a unique filename (keep original extension)
-        $ext         = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $uniqueName  = Uuid::uuid4()->toString() . '.' . $ext;
+        $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $mimeType = mime_content_type($file['tmp_name']);
+
+        if (!in_array($mimeType, $allowedMimeTypes)) {
+            throw new \Exception('Invalid file type. Only images are allowed');
+        }
+    }
+
+    /**
+     * Process and store uploaded file
+     * @return array File information
+     * @throws \Exception if file processing fails
+     */
+    private static function processFileUpload($file)
+    {
+        $uploadDir = __DIR__ . '/../assets/images/';
+
+        // Ensure upload directory exists
+        if (!is_dir($uploadDir)) {
+            if (!mkdir($uploadDir, 0755, true)) {
+                throw new \Exception('Failed to create upload directory');
+            }
+        }
+
+        // Generate unique filename
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $uniqueName = Uuid::uuid4()->toString() . '.' . $ext;
         $destination = $uploadDir . $uniqueName;
 
-        // ✅ Detect MIME type (e.g. image/png, image/jpeg)
+        // Detect MIME type
         $mimeType = mime_content_type($file['tmp_name']) ?: ($file['type'] ?? 'unknown');
 
-        // ✅ Move the file to /assets/images
+        // Move uploaded file
         if (!move_uploaded_file($file['tmp_name'], $destination)) {
             throw new \Exception('Failed to move uploaded file');
         }
 
-        // ✅ Get the actual size of the saved file (in bytes)
+        // Get file size
         $fileSize = filesize($destination);
 
-        // ✅ Store media record in the **medias** table
-        $media = R::dispense('media');
-        $media->title       = $title;
-        $media->description = $description;
-        $media->path        = '/assets/images/' . $uniqueName;
-        $media->author_id   = $currentUser->user->id;   // Link to user
-        $media->type        = $mimeType;               // Store MIME type
-        $media->size        = $fileSize;               // Store size in bytes
-        $media->created_at  = R::isoDateTime();
+        if ($fileSize === false) {
+            throw new \Exception('Failed to determine file size');
+        }
 
-        R::store($media);
-
-        // ✅ Return full response including human-readable size
         return [
-            'id'            => $media->id,
-            'title'         => $media->title,
-            'description'   => $media->description,
-            'path'          => $media->path,
-            'type'          => $media->type,
-            'author_id'     => $media->author_id,
-            'created_at'    => $media->created_at,
-            'size_bytes'    => $fileSize,
-            'size_readable' => self::formatSize($fileSize) // e.g. "2.34 MB"
+            'unique_name' => $uniqueName,
+            'path' => '/assets/images/' . $uniqueName,
+            'mime_type' => $mimeType,
+            'size' => $fileSize
         ];
+    }
+
+    /**
+     * Create media record in database
+     * @return array Media data
+     * @throws \Exception if database operation fails
+     */
+    private static function createMediaRecord($title, $description, $fileInfo, $authorId)
+    {
+        $uuid = Uuid::uuid4()->toString();
+        $createdAt = R::isoDateTime();
+
+        try {
+            R::exec(
+                "INSERT INTO media (title, uuid, description, path, author_id, type, size, created_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    $title,
+                    $uuid,
+                    $description,
+                    $fileInfo['path'],
+                    $authorId,
+                    $fileInfo['mime_type'],
+                    $fileInfo['size'],
+                    $createdAt
+                ]
+            );
+
+            $mediaId = R::getInsertID();
+
+            return [
+                'id' => $mediaId,
+                'uuid' => $uuid,
+                'title' => $title,
+                'description' => $description,
+                'path' => $fileInfo['path'],
+                'type' => $fileInfo['mime_type'],
+                'author_id' => $authorId,
+                'created_at' => $createdAt,
+                'size_bytes' => $fileInfo['size'],
+                'size_readable' => self::formatSize($fileInfo['size'])
+            ];
+        } catch (\Exception $e) {
+            // Clean up uploaded file if database insert fails
+            $fullPath = __DIR__ . '/../assets/images/' . $fileInfo['unique_name'];
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+
+            throw new \Exception('Failed to create media record: ' . $e->getMessage());
+        }
     }
 
     public static function getMediaById($id)

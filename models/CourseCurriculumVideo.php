@@ -105,7 +105,7 @@ class CourseCurriculumVideo
                 return self::errorResponse(500, 'Failed to create video record.');
             }
 
-            // ✅ Insert into curriculum_videos
+            // ✅ Insert into curriculum_videos 
             R::exec(
                 'INSERT INTO course_curriculum_videos 
                  (uuid, title, path, type, size, curriculum_id, video_id, created_at, author_id)
@@ -123,7 +123,7 @@ class CourseCurriculumVideo
                 ]
             );
 
-            // ✅ Return success  
+            // ✅ Return success   
             return [
                 'error'   => false,
                 'status'  => 201,

@@ -12,12 +12,25 @@ require_once __DIR__ . '/../models/CourseSection.php';
 
 require_once __DIR__ . '/../models/OrderLine.php';
 
+require_once __DIR__ . '/../models/Video.php';
+
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
 use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade 
 
 class Course
 {
+
+    /** 🔹 Helper for consistent error responses */
+    private static function errorResponse($status, $message, $errors = null)
+    {
+        return array_filter([
+            'error'   => true,
+            'status'  => $status,
+            'message' => $message,
+            'errors'  => $errors
+        ]);
+    }
     public static function createCourse($data)
     {
         $validator = new \Rakit\Validation\Validator;
@@ -131,7 +144,8 @@ class Course
             'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
             'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
             'instructional_level' => $course->instructional_level,
-            'goals'       => $courseGoals // Include course goals 
+            'goals'       => $courseGoals,
+            'promo_video' => Video::find($course->promo_video)
         ];
 
         http_response_code(200); // ✅ OK response   
@@ -282,6 +296,12 @@ class Course
             $course->cover_image = (int)$data['cover_image'];
         }
 
+        echo json_encode($data['promo_video']);
+
+        if (!empty($data['promo_video']) && !is_array($data['promo_video'])) {
+            $course->promo_video = (int)$data['promo_video'];
+        }
+
         $course->updated_at = R::isoDateTime();
         R::store($course);
 
@@ -304,6 +324,7 @@ class Course
                 'author_id'   => $course->author_id,
                 'cover_image' => Media::getMediaById($course->cover_image), // Fetch cover image details
                 'instructional_level' => CourseLevel::getCourseLevelById($course->instructional_level),
+                'promo_video' => Video::find($course->promo_video),
                 'goals'       => $courseGoals // Include course goals
             ]
         ];
@@ -699,6 +720,190 @@ class Course
                     'sections' => CourseSection::getSectionsDataByCourseId((int) $course->id, $showAsset = true)
                 ]
             ]
+        ];
+    }
+
+    public static function uploadPromoVideo($data)
+    {
+
+        $input = $input ?? $_POST;
+        $currentUser = AuthController::getCurrentUser();
+        $authorId = $currentUser->id ?? $currentUser->user->id ?? null;
+
+        // ✅ Validate file upload
+        if (empty($_FILES['promo_video']) || $_FILES['promo_video']['error'] !== UPLOAD_ERR_OK) {
+            return self::errorResponse(400, 'No valid file uploaded.');
+        }
+
+        $file = $_FILES['promo_video'];
+        $fileType = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+
+        // ✅ Validate request fields
+        $validator = new \Rakit\Validation\Validator();
+        $validation = $validator->make($input, [
+            'course_uuid' => 'required',
+        ]);
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return self::errorResponse(422, 'Please check the validated fields.', $validation->errors()->firstOfAll());
+        }
+
+        // ✅ Allowed file types 
+        $allowedTypes = ['mp4', 'webm', 'avi', 'mov'];
+        if (!in_array($fileType, $allowedTypes)) {
+            return self::errorResponse(415, 'Invalid file type. Allowed: mp4, webm, avi, mov.');
+        }
+
+        try {
+            $uuid = Uuid::uuid4()->toString();
+            $course_uuid = (int) $input['course_uuid'];
+            $now = date('Y-m-d H:i:s');
+
+            // ✅ Ensure course exists
+            $course = R::findOne('courses', 'uuid = ?', [$course_uuid]);
+            if (!$course) {
+                return self::errorResponse(404, 'Course not found.');
+            }
+
+
+            // ✅ Ensure upload directory
+            $uploadDir = __DIR__ . '/../assets/videos/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            // ✅ File handling
+            $fileName = $uuid . '.' . $fileType;
+            $filePath = $uploadDir . $fileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+                return self::errorResponse(500, 'Failed to move uploaded file.');
+            }
+
+            // ✅ Create video record
+            $videoTitle = $input['title'] ?? pathinfo($file['name'], PATHINFO_FILENAME);
+            $videoId = Video::create([
+                'title'     => $videoTitle,
+                'path'      => '/assets/videos/' . $fileName,
+                'type'      => $fileType,
+                'size'      => $file['size'],
+                'author_id' => $authorId
+            ]);
+
+            if (!$videoId) {
+                return self::errorResponse(500, 'Failed to create video record.');
+            }
+
+            $video = Video::find($videoId);
+
+            return $video;
+        } catch (\Exception $e) {
+            return self::errorResponse(500, $e->getMessage(), $e->getMessage()); // ⚠ debug field only in dev
+        }
+    }
+
+    public static function unpublish($uuid)
+    {
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser || !isset($currentUser->user)) {
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'Access denied.'
+            ];
+        }
+
+
+
+        $course = R::findOne('courses', 'uuid = ?', [$uuid]);
+
+
+        if ($course->published == 0) {
+            return [
+                'error'   => true,
+                'status'  => 400,
+                'message' => 'Course is already drafted. Please refresh your page and try again.'
+            ];
+        }
+
+        if ($currentUser->user->id !== $course->author_id) {
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'You are not authorized to unpublish this course.'
+            ];
+        }
+
+
+        if (!$course) {
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $course->published = 0;
+        $course->updated_at = R::isoDateTime();
+        R::store($course);
+
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'message' => 'Course unpublished successfully.'
+        ];
+    }
+
+    public static function publish($uuid)
+    {
+        $currentUser = AuthController::getCurrentUser();
+        if (!$currentUser || !isset($currentUser->user)) {
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'Access denied.'
+            ];
+        }
+
+
+
+        $course = R::findOne('courses', 'uuid = ?', [$uuid]);
+
+
+        if ($course->published == 0) {
+            return [
+                'error'   => true,
+                'status'  => 400,
+                'message' => 'Course is already unpublished.'
+            ];
+        }
+
+        if ($currentUser->user->id !== $course->author_id) {
+            return [
+                'error'   => true,
+                'status'  => 403,
+                'message' => 'You are not authorized to unpublish this course.'
+            ];
+        }
+
+
+        if (!$course) {
+            return [
+                'error'   => true,
+                'status'  => 404,
+                'message' => 'Course not found.'
+            ];
+        }
+
+        $course->published = 1;
+        $course->updated_at = R::isoDateTime();
+        R::store($course);
+
+        return [
+            'error'   => false,
+            'status'  => 200,
+            'message' => 'Course unpublished successfully.'
         ];
     }
 }
