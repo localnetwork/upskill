@@ -38,7 +38,7 @@ class Media
         // Validate file upload
         self::validateFileUpload($file);
 
-        // Process and store the file
+        // Process and store the file   
         $fileInfo = self::processFileUpload($file);
 
         // Create media record
@@ -130,7 +130,7 @@ class Media
         ];
     }
 
-    /**
+    /** 
      * Create media record in database
      * @return array Media data
      * @throws \Exception if database operation fails
@@ -141,38 +141,29 @@ class Media
         $createdAt = R::isoDateTime();
 
         try {
-            R::exec(
-                "INSERT INTO media (title, uuid, description, path, author_id, type, size, created_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    $title,
-                    $uuid,
-                    $description,
-                    $fileInfo['path'],
-                    $authorId,
-                    $fileInfo['mime_type'],
-                    $fileInfo['size'],
-                    $createdAt
-                ]
-            );
+            // Validate file info structure
+            if (!isset($fileInfo['path'], $fileInfo['mime_type'], $fileInfo['size'], $fileInfo['unique_name'])) {
+                throw new \Exception('Invalid file information provided.');
+            }
 
-            $mediaId = R::getInsertID();
+            $media = R::dispense('media');
 
-            return [
-                'id' => $mediaId,
-                'uuid' => $uuid,
-                'title' => $title,
-                'description' => $description,
-                'path' => $fileInfo['path'],
-                'type' => $fileInfo['mime_type'],
-                'author_id' => $authorId,
-                'created_at' => $createdAt,
-                'size_bytes' => $fileInfo['size'],
-                'size_readable' => self::formatSize($fileInfo['size'])
-            ];
+            $media->title       = $title;
+            $media->uuid        = $uuid;
+            $media->description = $description;
+            $media->path        = $fileInfo['path'];
+            $media->author_id   = $authorId;
+            $media->type        = $fileInfo['mime_type'];
+            $media->size        = $fileInfo['size'];
+            $media->created_at  = $createdAt;
+            $media->id = R::store($media);
+
+            return $media;
         } catch (\Exception $e) {
             // Clean up uploaded file if database insert fails
-            $fullPath = __DIR__ . '/../assets/images/' . $fileInfo['unique_name'];
+            $uploadDir = __DIR__ . '/../assets/images/';
+            $fullPath = $uploadDir . basename($fileInfo['unique_name']);
+
             if (file_exists($fullPath)) {
                 unlink($fullPath);
             }
@@ -180,6 +171,7 @@ class Media
             throw new \Exception('Failed to create media record: ' . $e->getMessage());
         }
     }
+
 
     public static function getMediaById($id)
     {

@@ -596,6 +596,7 @@ class Course
         // Add extra data
         $courseArr['author']              = User::getPublicProfileById($course->author_id);
         $courseArr['cover_image']         = Media::getMediaById($course->cover_image);
+        $courseArr['promo_video']         = Video::find($course->promo_video);
         $courseArr['instructional_level'] = CourseLevel::getCourseLevelById($course->instructional_level);
         $courseArr['resources_count']     = CourseSection::getCourseSectionCount((int) $course->id);
         $courseArr['goals']               = CourseGoal::getCourseGoalByCourseId($course->id);
