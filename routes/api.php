@@ -20,7 +20,7 @@ require_once __DIR__ . '/../controllers/CoursePriceTierController.php';
 require_once __DIR__ . '/../controllers/CheckoutController.php';
 require_once __DIR__ . '/../controllers/OrderController.php';
 require_once __DIR__ . '/../controllers/CurriculumProgressController.php';
-
+require_once __DIR__ . '/../controllers/CategoryController.php';
 
 $router = new Router();
 
@@ -63,6 +63,12 @@ $router->group('/api', function ($r, $prefix) {
 
     $r->add('GET', $prefix . '/user/<id>', function ($id) {
         UserController::getUserByUsername($id);
+    });
+
+    // ==================== COURSE CATEGORIES ====================
+
+    $r->add('GET', $prefix . '/categories', function () {
+        CategoryController::getParentCategories();
     });
 
     // ==================== COURSE ROUTES ====================
@@ -205,6 +211,8 @@ $router->group('/api', function ($r, $prefix) {
         jwt_middleware();
         MediaController::create();
     });
+
+
 
     // ==================== CART ROUTES ====================
     $r->add('POST', $prefix . '/cart', function () {

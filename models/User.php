@@ -197,7 +197,7 @@ class User
 
                 ],
                 'iat'   => time(),
-                'exp'   => time() + 3600 // 1 hour expiry
+                // 'exp'   => time() + 3600 // 1 hour expiry
             ];
 
             // ✅ Use the getter

@@ -43,6 +43,23 @@ class CourseCurriculum
         return $curriculum;
     }
 
+    private static function _getDuration(array $curriculum)
+    {
+        switch ($curriculum['curriculum_resource_type'] ?? null) {
+            case 'article':
+                return CourseCurriculumArticle::getArticleDurationByCurriculumId($curriculum['id']);
+
+            case 'quiz':
+                return null; // placeholder for future Quiz model
+
+            case 'coding_exercise':
+                return null; // placeholder for coding exercise model
+
+            default:
+                return null;
+        }
+    }
+
     public static function createCurriculum($data)
     {
         $currentUser = AuthController::getCurrentUser();
@@ -187,6 +204,9 @@ class CourseCurriculum
 
                 // Optional isTaken check only if user exists
                 $isTaken = false;
+
+
+
                 if ($currentUser && isset($currentUser->user->id)) {
                     $isTaken = R::getCell(
                         'SELECT COUNT(*) FROM curriculum_progress 
@@ -207,6 +227,9 @@ class CourseCurriculum
                 if ($showAsset) {
                     $row = self::_attachResourceData($row);
                 }
+
+                $estimatedDuration = self::_getDuration($row);
+                $row['estimated_duration'] = $estimatedDuration;
 
                 $grouped[$sectionId][] = $row;
             }

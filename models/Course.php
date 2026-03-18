@@ -258,6 +258,7 @@ class Course
             'subtitle'            => 'max:255',
             'description'         => 'min:200|max:10000',
             'instructional_level' => 'numeric', // optional numeric FK
+            'category_id'        => 'numeric', // optional numeric FK 
         ]);
         $validation->validate();
 
@@ -314,6 +315,7 @@ class Course
                 'id'          => $course->id,
                 'title'       => $course->title,
                 'subtitle'    => $course->subtitle,
+                'category_id' => $course->category_id,
                 'description' => $course->description,
                 'slug'        => $course->slug,
                 'published'   => $course->published,

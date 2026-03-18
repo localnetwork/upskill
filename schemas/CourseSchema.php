@@ -12,6 +12,7 @@ return [
     'promo_video' => 'INT(255)',
     'cover_image' => 'INT(255)',
     'price_tier' => 'INT(255)',
+    'category_id' => 'INT(255)',
     '_foreign' => [
         'fk_course_cover_image' => 'FOREIGN KEY (cover_image) REFERENCES medias(id) ON DELETE SET NULL',
         'fk_course_author' => 'FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE',
