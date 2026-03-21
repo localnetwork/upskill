@@ -36,6 +36,29 @@ class CategorySeeder
             : $base . '-' . substr(md5(uniqid()), 0, 6);
     }
 
+    private function loadCategories(): array
+    {
+        $jsonPath = __DIR__ . '/../data/categories.json';
+
+        if (!file_exists($jsonPath)) {
+            throw new \RuntimeException("categories.json not found at: {$jsonPath}");
+        }
+
+        $json = file_get_contents($jsonPath);
+
+        if ($json === false) {
+            throw new \RuntimeException("Failed to read categories.json");
+        }
+
+        $data = json_decode($json, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException("Invalid JSON in categories.json: " . json_last_error_msg());
+        }
+
+        return $data;
+    }
+
     public function run(): void
     {
         $authorId = 1;
@@ -45,202 +68,50 @@ class CategorySeeder
             return;
         }
 
-        $mainCategories = [
-            'Development',
-            'Business',
-            'Finance & Accounting',
-            'IT & Software',
-            'Office Productivity',
-            'Personal Development',
-            'Design',
-            'Marketing',
-            'Lifestyle',
-            'Photography & Video',
-            'Health & Fitness',
-            'Music',
-            'Teaching & Academics',
-        ];
+        // Guard: confirm author exists before inserting anything
+        $authorExists = R::count('users', 'id = ?', [$authorId]);
+        if (!$authorExists) {
+            echo "❌ author_id={$authorId} does not exist in the users table. Aborting.\n";
+            return;
+        }
 
-        $subcategories = [
-            'Development'          => [
-                'Web Development',
-                'Data Science',
-                'Mobile Development',
-                'Programming Languages',
-                'Game Development',
-                'Database Design & Development',
-                'Software Testing',
-                'Software Engineering',
-                'Software Development Tools',
-                'No-Code Development',
-            ],
-            'Business'             => [
-                'Entrepreneurship',
-                'Communication',
-                'Management',
-                'Sales',
-                'Business Strategy',
-                'Operations',
-                'Project Management',
-                'Business Law',
-                'Business Analytics & Intelligence',
-                'Human Resources',
-                'Industry',
-                'E-Commerce',
-                'Media',
-                'Real Estate',
-                'Other Business',
-            ],
-            'Finance & Accounting' => [
-                'Accounting & Bookkeeping',
-                'Compliance',
-                'Cryptocurrency & Blockchain',
-                'Economics',
-                'Finance',
-                'Finance Cert & Exam Prep',
-                'Financial Modeling & Analysis',
-                'Investing & Trading',
-                'Money Management Tools',
-                'Taxes',
-                'Other Finance & Accounting',
-            ],
-            'IT & Software'        => [
-                'IT Certifications',
-                'Network & Security',
-                'Hardware',
-                'Operating Systems & Servers',
-                'Other IT & Software',
-            ],
-            'Office Productivity'  => [
-                'Microsoft',
-                'Apple',
-                'Google',
-                'SAP',
-                'Oracle',
-                'Other Office Productivity',
-            ],
-            'Personal Development' => [
-                'Personal Transformation',
-                'Personal Productivity',
-                'Leadership',
-                'Career Development',
-                'Parenting & Relationships',
-                'Happiness',
-                'Esoteric Practices',
-                'Religion & Spirituality',
-                'Personal Brand Building',
-                'Creativity',
-                'Influence',
-                'Self Esteem & Confidence',
-                'Stress Management',
-                'Memory & Study Skills',
-                'Motivation',
-                'Other Personal Development',
-            ],
-            'Design'               => [
-                'Web Design',
-                'Graphic Design & Illustration',
-                'Design Tools',
-                'User Experience Design',
-                'Game Design',
-                '3D & Animation',
-                'Fashion Design',
-                'Architectural Design',
-                'Interior Design',
-                'Other Design',
-            ],
-            'Marketing'            => [
-                'Digital Marketing',
-                'Search Engine Optimization',
-                'Social Media Marketing',
-                'Branding',
-                'Marketing Fundamentals',
-                'Marketing Analytics & Automation',
-                'Public Relations',
-                'Paid Advertising',
-                'Video & Mobile Marketing',
-                'Content Marketing',
-                'Growth Hacking',
-                'Affiliate Marketing',
-                'Product Marketing',
-                'Other Marketing',
-            ],
-            'Lifestyle'            => [
-                'Arts & Crafts',
-                'Beauty & Makeup',
-                'Esoteric Practices',
-                'Food & Beverage',
-                'Gaming',
-                'Home Improvement & Gardening',
-                'Pet Care & Training',
-                'Travel',
-                'Other Lifestyle',
-            ],
-            'Photography & Video'  => [
-                'Digital Photography',
-                'Photography',
-                'Portrait Photography',
-                'Photography Tools',
-                'Commercial Photography',
-                'Video Design',
-                'Other Photography & Video',
-            ],
-            'Health & Fitness'     => [
-                'Fitness',
-                'General Health',
-                'Sports',
-                'Nutrition & Diet',
-                'Yoga',
-                'Mental Health',
-                'Martial Arts & Self Defense',
-                'Safety & First Aid',
-                'Dance',
-                'Meditation',
-                'Other Health & Fitness',
-            ],
-            'Music'                => [
-                'Instruments',
-                'Music Production',
-                'Music Fundamentals',
-                'Vocal',
-                'Music Techniques',
-                'Music Software',
-                'Other Music',
-            ],
-            'Teaching & Academics' => [
-                'Engineering',
-                'Humanities',
-                'Math',
-                'Science',
-                'Online Education',
-                'Social Science',
-                'Language Learning',
-                'Teacher Training',
-                'Test Prep',
-                'Other Teaching & Academics',
-            ],
-        ];
+        // Load categories from JSON and split into the same structure as before
+        try {
+            $data = $this->loadCategories();
+        } catch (\RuntimeException $e) {
+            echo "❌ " . $e->getMessage() . "\n";
+            return;
+        }
+
+        $mainCategories = array_column($data, 'title');
+
+        $subcategories = [];
+        foreach ($data as $entry) {
+            $subcategories[$entry['title']] = $entry['subcategories'] ?? [];
+        }
 
         $categoryMap = [];
 
-        echo "🚀 Starting CourseCategorySeeder...\n";
+        echo "🚀 Starting CategorySeeder...\n";
 
         R::begin();
 
         try {
             // ── Main categories ───────────────────────────────────────────
             foreach ($mainCategories as $title) {
+
+                // Find-or-create: reuse existing row if present
                 $existing = R::findOne('categories', 'title = ? AND parent_id IS NULL', [$title]);
 
                 if ($existing) {
                     $categoryMap[$title] = (int) $existing->id;
-                    echo "⚠️  Parent category exists: {$title} (ID: {$existing->id})\n";
+                    echo "⚠️  Parent category exists, reusing: {$title} (ID: {$existing->id})\n";
                     continue;
                 }
 
                 $uuid = Uuid::uuid4()->toString();
                 $slug = $this->uniqueSlug($title);
-                $now  = R::isoDateTime();
+                $now  = date('Y-m-d H:i:s');
 
                 R::exec(
                     "INSERT INTO categories (uuid, title, slug, parent_id, author_id, created_at, updated_at)
@@ -248,11 +119,10 @@ class CategorySeeder
                     [$uuid, $title, $slug, $authorId, $now, $now]
                 );
 
-                // Fetch the inserted row by UUID to get the real ID
                 $inserted = R::findOne('categories', 'uuid = ?', [$uuid]);
 
                 if (!$inserted) {
-                    throw new \RuntimeException("Could not find inserted parent category: {$title}");
+                    throw new \RuntimeException("Insert failed for parent category: {$title}");
                 }
 
                 $categoryMap[$title] = (int) $inserted->id;
@@ -282,7 +152,7 @@ class CategorySeeder
 
                     $uuid = Uuid::uuid4()->toString();
                     $slug = $this->uniqueSlug($title, $parentTitle);
-                    $now  = R::isoDateTime();
+                    $now  = date('Y-m-d H:i:s');
 
                     R::exec(
                         "INSERT INTO categories (uuid, title, slug, parent_id, author_id, created_at, updated_at)
@@ -290,11 +160,10 @@ class CategorySeeder
                         [$uuid, $title, $slug, $parentId, $authorId, $now, $now]
                     );
 
-                    // Fetch the inserted row by UUID to get the real ID
                     $inserted = R::findOne('categories', 'uuid = ?', [$uuid]);
 
                     if (!$inserted) {
-                        throw new \RuntimeException("Could not find inserted subcategory: {$title} (Parent: {$parentTitle})");
+                        throw new \RuntimeException("Insert failed for subcategory: {$title} (Parent: {$parentTitle})");
                     }
 
                     echo "✅ Inserted subcategory: {$title} (Parent: {$parentTitle}, ID: {$inserted->id}, slug: {$slug})\n";
@@ -302,7 +171,7 @@ class CategorySeeder
             }
 
             R::commit();
-            echo "\n✅ CourseCategorySeeder completed successfully.\n";
+            echo "\n✅ CategorySeeder completed successfully.\n";
         } catch (\Throwable $e) {
             R::rollback();
             echo "\n❌ Seeder failed and was rolled back.\n";
