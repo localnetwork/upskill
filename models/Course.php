@@ -14,6 +14,9 @@ require_once __DIR__ . '/../models/OrderLine.php';
 
 require_once __DIR__ . '/../models/Video.php';
 
+
+require_once __DIR__ . '/../models/CourseCategory.php';
+
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
 use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade 
@@ -129,6 +132,7 @@ class Course
 
         $courseGoals = CourseGoal::getCourseGoalByCourseId($course->id);
 
+
         $data = [
             'id'          => $course->id,
             'title'       => $course->title,
@@ -145,7 +149,8 @@ class Course
             'price_tier' => CoursePriceTier::getCoursePriceTierById($course->price_tier),
             'instructional_level' => $course->instructional_level,
             'goals'       => $courseGoals,
-            'promo_video' => Video::find($course->promo_video)
+            'promo_video' => Video::find($course->promo_video),
+            'category_ids'  => CourseCategory::getCourseCategories($course->id)
         ];
 
         http_response_code(200); // ✅ OK response   
@@ -241,7 +246,10 @@ class Course
 
         $courseGoals = CourseGoal::getCourseGoalByCourseId($course->id);
 
-        // Authorization
+
+
+
+        // Authorization 
         if ((int)$currentUser->user->id !== (int)$course->author_id) {
             http_response_code(403);
             return [
@@ -258,7 +266,7 @@ class Course
             'subtitle'            => 'max:255',
             'description'         => 'min:200|max:10000',
             'instructional_level' => 'numeric', // optional numeric FK
-            'category_id'        => 'numeric', // optional numeric FK 
+            'category_ids'        => 'array', // optional array of numeric FKs
         ]);
         $validation->validate();
 
@@ -282,6 +290,8 @@ class Course
             ? (is_array($data['description']) ? json_encode($data['description']) : trim($data['description']))
             : $course->description;
 
+
+
         // Instructional level FK validation
         if (!empty($data['instructional_level']) && !is_array($data['instructional_level'])) {
             $levelId = (int)$data['instructional_level'];
@@ -297,13 +307,19 @@ class Course
             $course->cover_image = (int)$data['cover_image'];
         }
 
-        echo json_encode($data['promo_video']);
+        // echo json_encode($data['promo_video']);
 
         if (!empty($data['promo_video']) && !is_array($data['promo_video'])) {
             $course->promo_video = (int)$data['promo_video'];
         }
 
         $course->updated_at = R::isoDateTime();
+
+
+        $courseCategory = new CourseCategory();
+        $category_ids = $courseCategory->updateCourseCategories($course->id, $data['category_ids'] ?? [], $course->author_id);
+
+
         R::store($course);
 
         http_response_code(200);
@@ -315,7 +331,7 @@ class Course
                 'id'          => $course->id,
                 'title'       => $course->title,
                 'subtitle'    => $course->subtitle,
-                'category_id' => $course->category_id,
+                'category_ids' => $category_ids,
                 'description' => $course->description,
                 'slug'        => $course->slug,
                 'published'   => $course->published,
@@ -607,6 +623,7 @@ class Course
         // $courseArr['is_enrolled']       =  OrderLine::checkCourseEnrolled($course->id) || false;
         $courseArr['price_tier']         = CoursePriceTier::getCoursePriceTierById($course->price_tier);
         $courseArr['is_enrolled']        = OrderLine::checkCourseEnrolled($course->id);
+        $courseArr['categories']         = CourseCategory::getCourseCategories($course->id);
 
         return $courseArr;
     }

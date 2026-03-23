@@ -35,4 +35,49 @@ class Category
 
         return $result;
     }
+
+    public function updateCategory($id, $data)
+    {
+        $category = R::load('categories', $id);
+        if (!$category->id) {
+            throw new Exception("Category not found");
+        }
+
+        foreach ($data as $key => $value) {
+            $category->$key = $value;
+        }
+
+        R::store($category);
+    }
+
+    public function createCategory($data)
+    {
+        $category = R::dispense('categories');
+
+        foreach ($data as $key => $value) {
+            $category->$key = $value;
+        }
+
+        R::store($category);
+    }
+
+    public function getCategoryBySlug($slug)
+    {
+        $category = R::findOne('categories', 'slug = ?', [$slug]);
+        if (!$category) {
+            throw new Exception("Category not found");
+        }
+
+        return $category;
+    }
+
+    public function deleteCategory($id)
+    {
+        $category = R::load('categories', $id);
+        if (!$category->id) {
+            throw new Exception("Category not found");
+        }
+
+        R::trash($category);
+    }
 }

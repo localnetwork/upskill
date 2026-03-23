@@ -71,6 +71,10 @@ $router->group('/api', function ($r, $prefix) {
         CategoryController::getParentCategories();
     });
 
+    $r->add('GET', $prefix . '/categories/<slug>', function ($slug) {
+        CategoryController::viewCategoryBySlug($slug);
+    });
+
     // ==================== COURSE ROUTES ====================
     // Public Course Routes
     $r->add('GET', $prefix . '/courses', function () {
