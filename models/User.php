@@ -3,34 +3,36 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/env.php';
 
-
 require_once __DIR__ . '/../models/UserRole.php';
 
 use Ramsey\Uuid\Uuid;
 use Firebase\JWT\JWT;
-
-use RedBeanPHP\R; // ✅ Import RedBeanPHP static facade 
+use RedBeanPHP\R;
+use PragmaRX\Google2FA\Google2FA;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 
 class User
 {
-    // Just declare – no default here!
     protected static string $jwt_key;
 
-    /** 
-     * Return the JWT key from cache or from .env
-     */
     protected static function jwtKey(): string
     {
-        // Load it once and reuse
         if (!isset(self::$jwt_key)) {
             self::$jwt_key = env('JWT_SECRET', 'default_secret');
         }
         return self::$jwt_key;
     }
 
+    // =========================================================================
+    // EXISTING METHODS (unchanged)
+    // =========================================================================
+
     public static function create($data)
     {
-        $validator = new \Rakit\Validation\Validator;
+        $validator  = new \Rakit\Validation\Validator;
         $validation = $validator->make($data, [
             'username'         => 'required|max:10|min:3|regex:/^[A-Za-z0-9@_-]+$/',
             'firstname'        => 'required|max:30|min:2',
@@ -38,7 +40,7 @@ class User
             'password'         => 'required|max:16|min:8|regex:/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/',
             'confirm_password' => 'required|max:16|same:password',
             'email'            => 'required|max:60|regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
-            'role'             => 'required|in:2,3', // 2 = Teacher, 3 = Student
+            'role'             => 'required|in:2,3',
         ], [
             'username:regex'        => 'Username can only contain letters, numbers, dashes (-), underscores (_), or @.',
             'firstname:min'         => 'Firstname must be at least 2 characters long.',
@@ -50,7 +52,6 @@ class User
         ]);
         $validation->validate();
 
-        // Extra DB checks if base validation passed
         if (!$validation->fails()) {
             if (R::findOne('users', 'username = ?', [$data['username']])) {
                 $validation->errors()->add('username', 'custom', 'The username is already taken.');
@@ -69,11 +70,9 @@ class User
             ];
         }
 
-        // ✅ Transaction: both user and role must succeed
         R::begin();
         try {
-            // Create the user
-            $user = R::dispense('users');
+            $user            = R::dispense('users');
             $user->uuid      = Uuid::uuid4()->toString();
             $user->username  = $data['username'];
             $user->password  = password_hash($data['password'], PASSWORD_DEFAULT);
@@ -83,17 +82,14 @@ class User
             $user->verified  = 0;
             $user->status    = 1;
 
-            $userId = R::store($user); // may throw exception
-
-            // Assign role
-            $roleId = (int) $data['role'];
-            $userRoleId = UserRole::create($userId, $roleId); // must return an ID
+            $userId     = R::store($user);
+            $roleId     = (int) $data['role'];
+            $userRoleId = UserRole::create($userId, $roleId);
 
             if (!$userRoleId) {
                 throw new \Exception('Failed to create user role record.');
             }
 
-            // ✅ Commit only if both inserts succeeded
             R::commit();
         } catch (\Exception $e) {
             R::rollback();
@@ -104,49 +100,48 @@ class User
             ];
         }
 
-        // ✅ Generate JWT only if commit succeeded
-        $roles = UserRole::getUserRoles($userId);
+        $roles   = UserRole::getUserRoles($userId);
         $payload = [
-            'user'   => [
-                'id'       => $user->id,
-                'username' => $user->username,
-                'firstname' => $user->firstname,
-                'lastname' => $user->lastname,
-                'email'    => $user->email,
-                'uuid'     => $user->uuid,
-                'verified' => $user->verified,
-                'status'   => $user->status,
-                'roles'    => $roles,
-            ],
-            'iat'   => time(),
-            'exp'   => time() + 3600 // 1 hour expiry
-        ];
-
-        $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
-
-        echo json_encode([
-            'message' => 'User registered successfully.',
-            'token'  => $jwt,
-            'user'   => [
+            'user' => [
                 'id'        => $user->id,
                 'username'  => $user->username,
                 'firstname' => $user->firstname,
                 'lastname'  => $user->lastname,
                 'email'     => $user->email,
                 'uuid'      => $user->uuid,
-                'roles'     => $roles,
                 'verified'  => $user->verified,
                 'status'    => $user->status,
-                'biography' => $user->biography,
-                'headline'  => $user->headline,
+                'roles'     => $roles,
+            ],
+            'iat' => time(),
+            'exp' => time() + 3600,
+        ];
+
+        $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
+
+        echo json_encode([
+            'message' => 'User registered successfully.',
+            'token'   => $jwt,
+            'user'    => [
+                'id'           => $user->id,
+                'username'     => $user->username,
+                'firstname'    => $user->firstname,
+                'lastname'     => $user->lastname,
+                'email'        => $user->email,
+                'uuid'         => $user->uuid,
+                'roles'        => $roles,
+                'verified'     => $user->verified,
+                'status'       => $user->status,
+                'biography'    => $user->biography,
+                'headline'     => $user->headline,
                 'link_website' => $user->link_website,
-                'link_x' => $user->link_x,
-                'link_linkedin' => $user->link_linkedin,
+                'link_x'       => $user->link_x,
+                'link_linkedin'  => $user->link_linkedin,
                 'link_instagram' => $user->link_instagram,
-                'link_facebook' => $user->link_facebook,
-                'link_tiktok' => $user->link_tiktok,
-                'link_youtube' => $user->link_youtube,
-                'link_github' => $user->link_github,
+                'link_facebook'  => $user->link_facebook,
+                'link_tiktok'    => $user->link_tiktok,
+                'link_youtube'   => $user->link_youtube,
+                'link_github'    => $user->link_github,
             ]
         ]);
         exit;
@@ -156,7 +151,7 @@ class User
     {
         header('Content-Type: application/json');
 
-        $validator = new \Rakit\Validation\Validator;
+        $validator  = new \Rakit\Validation\Validator;
         $validation = $validator->make($data, [
             'username' => 'required',
             'password' => 'required',
@@ -176,65 +171,80 @@ class User
         $username = $data['username'] ?? '';
         $password = $data['password'] ?? '';
 
-        $user = self::findByUsername($username)
-            ?? self::findByEmail($username);
+        $user = self::findByUsername($username) ?? self::findByEmail($username);
 
-        if ($user && password_verify($password, $user->password)) {
-
-            $roles = UserRole::getUserRoles($user->id);
-
-            $payload = [
-                'user'   => [
-                    'id'       => $user->id,
-                    'username' => $user->username,
-                    'firstname' => $user->firstname,
-                    'lastname' => $user->lastname,
-                    'email'    => $user->email,
-                    'uuid'     => $user->uuid,
-                    'verified' => $user->verified,
-                    'status'   => $user->status,
-                    'roles'    => $roles,
-
-                ],
-                'iat'   => time(),
-                // 'exp'   => time() + 3600 // 1 hour expiry
-            ];
-
-            // ✅ Use the getter
-            $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
-
-            echo json_encode([
-                'status' => 'success',
-                'token'  => $jwt,
-                'user'   => [
-                    'id'       => $user->id,
-                    'username' => $user->username,
-                    'firstname' => $user->firstname,
-                    'lastname' => $user->lastname,
-                    'email'    => $user->email,
-                    'uuid'     => $user->uuid,
-                    'verified' => $user->verified,
-                    'status'   => $user->status,
-                    'roles'    => $roles,
-                    'biography' => $user->biography,
-                    'headline'  => $user->headline,
-                    'user_picture' => Media::getMediaById($user->user_picture),
-                    'link_website' => $user->link_website,
-                    'link_x' => $user->link_x,
-                    'link_linkedin' => $user->link_linkedin,
-                    'link_instagram' => $user->link_instagram,
-                    'link_facebook' => $user->link_facebook,
-                    'link_tiktok' => $user->link_tiktok,
-                    'link_youtube' => $user->link_youtube,
-                    'link_github' => $user->link_github,
-                ]
-            ]);
-            exit;
-        } else {
+        if (!$user || !password_verify($password, $user->password)) {
             http_response_code(422);
             echo json_encode(['message' => 'These credentials do not match our records.']);
             exit;
         }
+
+        $roles = UserRole::getUserRoles($user->id);
+
+        // ── 2FA check ──────────────────────────────────────────────────────────
+        if ($user->totp_enabled) {
+            // Issue a short-lived pre-auth token (5 min), not a full JWT
+            $preAuthPayload = [
+                'sub'  => $user->id,
+                'type' => 'pre_auth',
+                'iat'  => time(),
+                'exp'  => time() + 300, // 5 minutes
+            ];
+            $preAuthToken = JWT::encode($preAuthPayload, env('JWT_SECRET'), 'HS256');
+
+            echo json_encode([
+                'status'         => 'requires_2fa',
+                'requires_2fa'   => true,
+                'pre_auth_token' => $preAuthToken,
+            ]);
+            exit;
+        }
+        // ── end 2FA check ──────────────────────────────────────────────────────
+
+        $payload = [
+            'user' => [
+                'id'        => $user->id,
+                'username'  => $user->username,
+                'firstname' => $user->firstname,
+                'lastname'  => $user->lastname,
+                'email'     => $user->email,
+                'uuid'      => $user->uuid,
+                'verified'  => $user->verified,
+                'status'    => $user->status,
+                'roles'     => $roles,
+            ],
+            'iat' => time(),
+        ];
+
+        $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
+
+        echo json_encode([
+            'status' => 'success',
+            'token'  => $jwt,
+            'user'   => [
+                'id'           => $user->id,
+                'username'     => $user->username,
+                'firstname'    => $user->firstname,
+                'lastname'     => $user->lastname,
+                'email'        => $user->email,
+                'uuid'         => $user->uuid,
+                'verified'     => $user->verified,
+                'status'       => $user->status,
+                'roles'        => $roles,
+                'biography'    => $user->biography,
+                'headline'     => $user->headline,
+                'user_picture' => Media::getMediaById($user->user_picture),
+                'link_website' => $user->link_website,
+                'link_x'       => $user->link_x,
+                'link_linkedin'  => $user->link_linkedin,
+                'link_instagram' => $user->link_instagram,
+                'link_facebook'  => $user->link_facebook,
+                'link_tiktok'    => $user->link_tiktok,
+                'link_youtube'   => $user->link_youtube,
+                'link_github'    => $user->link_github,
+            ]
+        ]);
+        exit;
     }
 
     public static function getPublicProfile($username)
@@ -249,35 +259,41 @@ class User
         $roles = UserRole::getUserRoles($user->id);
 
         echo json_encode([
-            'id'        => $user->id,
-            'username'  => $user->username,
-            'firstname' => $user->firstname,
-            'lastname'  => $user->lastname,
-            'uuid'      => $user->uuid,
-            'roles'     => $roles,
-            'biography' => $user->biography,
-            'headline'  => $user->headline,
+            'id'           => $user->id,
+            'username'     => $user->username,
+            'firstname'    => $user->firstname,
+            'lastname'     => $user->lastname,
+            'uuid'         => $user->uuid,
+            'roles'        => $roles,
+            'biography'    => $user->biography,
+            'headline'     => $user->headline,
             'user_picture' => Media::getMediaById($user->user_picture),
             'link_website' => $user->link_website,
-            'link_x' => $user->link_x,
-            'link_linkedin' => $user->link_linkedin,
+            'link_x'       => $user->link_x,
+            'link_linkedin'  => $user->link_linkedin,
             'link_instagram' => $user->link_instagram,
-            'link_facebook' => $user->link_facebook,
-            'link_tiktok' => $user->link_tiktok,
-            'link_youtube' => $user->link_youtube,
-            'link_github' => $user->link_github,
+            'link_facebook'  => $user->link_facebook,
+            'link_tiktok'    => $user->link_tiktok,
+            'link_youtube'   => $user->link_youtube,
+            'link_github'    => $user->link_github,
         ]);
         exit;
     }
 
     public static function findByUsername($username)
     {
-        return \RedBeanPHP\R::findOne('users', 'username = ?', [$username]);
+        return R::findOne('users', 'username = ?', [$username]);
     }
 
     public static function findByEmail($email)
     {
-        return \RedBeanPHP\R::findOne('users', 'email = ?', [$email]);
+        return R::findOne('users', 'email = ?', [$email]);
+    }
+
+    public static function findById(int $id)
+    {
+        $user = R::load('users', $id);
+        return $user->id ? $user : null;
     }
 
     public static function getPublicProfileById($id)
@@ -295,26 +311,26 @@ class User
         $roles = UserRole::getUserRoles($user->id);
 
         return [
-            'error'   => false,
-            'status'  => 200,
-            'data'    => [
-                'id'        => $user->id,
-                'username'  => $user->username,
-                'firstname' => $user->firstname,
-                'lastname'  => $user->lastname,
-                'uuid'      => $user->uuid,
-                'roles'     => $roles,
-                'biography' => $user->biography,
-                'headline'  => $user->headline,
+            'error'  => false,
+            'status' => 200,
+            'data'   => [
+                'id'           => $user->id,
+                'username'     => $user->username,
+                'firstname'    => $user->firstname,
+                'lastname'     => $user->lastname,
+                'uuid'         => $user->uuid,
+                'roles'        => $roles,
+                'biography'    => $user->biography,
+                'headline'     => $user->headline,
                 'user_picture' => Media::getMediaById($user->user_picture),
                 'link_website' => $user->link_website,
-                'link_x' => $user->link_x,
-                'link_linkedin' => $user->link_linkedin,
+                'link_x'       => $user->link_x,
+                'link_linkedin'  => $user->link_linkedin,
                 'link_instagram' => $user->link_instagram,
-                'link_facebook' => $user->link_facebook,
-                'link_tiktok' => $user->link_tiktok,
-                'link_youtube' => $user->link_youtube,
-                'link_github' => $user->link_github,
+                'link_facebook'  => $user->link_facebook,
+                'link_tiktok'    => $user->link_tiktok,
+                'link_youtube'   => $user->link_youtube,
+                'link_github'    => $user->link_github,
             ]
         ];
     }
@@ -324,14 +340,10 @@ class User
         $currentUser = AuthController::getCurrentUser();
 
         if (!$currentUser) {
-            return [
-                'error'   => true,
-                'status'  => 401,
-                'message' => 'Unauthorized.'
-            ];
+            return ['error' => true, 'status' => 401, 'message' => 'Unauthorized.'];
         }
 
-        $validator = new \Rakit\Validation\Validator;
+        $validator  = new \Rakit\Validation\Validator;
         $validation = $validator->make($data, [
             'firstname' => 'required|max:30|min:2',
             'lastname'  => 'required|max:30|min:2',
@@ -347,47 +359,32 @@ class User
             ];
         }
 
-        // ✅ Start transaction
         R::begin();
         try {
-            // ✅ Load the existing user
-            $user = R::load('users', id: $currentUser->user->id);
-            if (!$user->id) {
-                throw new \Exception('User not found.');
-            }
+            $user = R::load('users', $currentUser->user->id);
+            if (!$user->id) throw new \Exception('User not found.');
 
-            // ✅ Update only allowed fields
-            $user->firstname       = $data['firstname'];
-            $user->lastname        = $data['lastname'];
-            $user->biography       = $data['biography'] ?? $user->biography;
-            $user->headline        = $data['headline'] ?? $user->headline;
-            $user->link_website    = $data['link_website'] ?? $user->link_website;
-            $user->link_x          = $data['link_x'] ?? $user->link_x;
-            $user->link_linkedin   = $data['link_linkedin'] ?? $user->link_linkedin;
-            $user->link_instagram  = $data['link_instagram'] ?? $user->link_instagram;
-            $user->link_facebook   = $data['link_facebook'] ?? $user->link_facebook;
-            $user->link_tiktok     = $data['link_tiktok'] ?? $user->link_tiktok;
-            $user->link_youtube    = $data['link_youtube'] ?? $user->link_youtube;
-            $user->link_github     = $data['link_github'] ?? $user->link_github;
-            $user->updated_at      = R::isoDateTime();
+            $user->firstname      = $data['firstname'];
+            $user->lastname       = $data['lastname'];
+            $user->biography      = $data['biography']      ?? $user->biography;
+            $user->headline       = $data['headline']       ?? $user->headline;
+            $user->link_website   = $data['link_website']   ?? $user->link_website;
+            $user->link_x         = $data['link_x']         ?? $user->link_x;
+            $user->link_linkedin  = $data['link_linkedin']  ?? $user->link_linkedin;
+            $user->link_instagram = $data['link_instagram'] ?? $user->link_instagram;
+            $user->link_facebook  = $data['link_facebook']  ?? $user->link_facebook;
+            $user->link_tiktok    = $data['link_tiktok']    ?? $user->link_tiktok;
+            $user->link_youtube   = $data['link_youtube']   ?? $user->link_youtube;
+            $user->link_github    = $data['link_github']    ?? $user->link_github;
+            $user->updated_at     = R::isoDateTime();
 
-            // ✅ Save the changes
             R::store($user);
             R::commit();
 
-            return [
-                'error'   => false,
-                'status'  => 200,
-                'message' => 'Profile updated successfully.',
-                'data' => $user
-            ];
+            return ['error' => false, 'status' => 200, 'message' => 'Profile updated successfully.', 'data' => $user];
         } catch (\Exception $e) {
             R::rollback();
-            return [
-                'error'  => true,
-                'status' => 500,
-                'errors' => ['general' => 'Transaction failed: ' . $e->getMessage()],
-            ];
+            return ['error' => true, 'status' => 500, 'errors' => ['general' => 'Transaction failed: ' . $e->getMessage()]];
         }
     }
 
@@ -396,17 +393,11 @@ class User
         $currentUser = AuthController::getCurrentUser();
 
         if (!$currentUser) {
-            return [
-                'error'   => true,
-                'status'  => 401,
-                'message' => 'Unauthorized.'
-            ];
+            return ['error' => true, 'status' => 401, 'message' => 'Unauthorized.'];
         }
 
-        $validator = new \Rakit\Validation\Validator;
-        $validation = $validator->make($data, [
-            'user_picture' => 'required',
-        ]);
+        $validator  = new \Rakit\Validation\Validator;
+        $validation = $validator->make($data, ['user_picture' => 'required']);
         $validation->validate();
 
         if ($validation->fails()) {
@@ -424,8 +415,334 @@ class User
         return [
             'error'   => false,
             'status'  => 200,
-            'data' => Media::getMediaById($data['user_picture']),
+            'data'    => Media::getMediaById($data['user_picture']),
             'message' => 'Profile picture uploaded successfully.',
         ];
+    }
+
+    // =========================================================================
+    // 2FA METHODS
+    // =========================================================================
+
+    /**
+     * Step 1: Generate a TOTP secret and return QR code.
+     * Called when user opts in to 2FA. Does NOT enable it yet.
+     */
+    public static function setup2FA()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        $user        = R::load('users', $currentUser->user->id);
+
+        if (!$user->id) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found.']);
+            exit;
+        }
+
+        if ($user->totp_enabled) {
+            http_response_code(400);
+            echo json_encode(['error' => '2FA is already enabled.']);
+            exit;
+        }
+
+        $google2fa = new Google2FA();
+        $secret    = $google2fa->generateSecretKey();
+
+        // Save the secret but don't enable yet — user must confirm first
+        $user->totp_secret = $secret;
+        R::store($user);
+
+        // Build QR code as base64 SVG
+        $qrUrl    = $google2fa->getQRCodeUrl(
+            env('APP_NAME', 'Upskill'),
+            $user->email,
+            $secret
+        );
+        $renderer = new ImageRenderer(new RendererStyle(200), new SvgImageBackEnd());
+        $writer   = new Writer($renderer);
+        $qrSvg    = base64_encode($writer->writeString($qrUrl));
+
+        echo json_encode([
+            'status'  => 'success',
+            'secret'  => $secret,  // for manual entry in the app
+            'qr_code' => $qrSvg,   // use as: <img src="data:image/svg+xml;base64,..." />
+        ]);
+        exit;
+    }
+
+    /**
+     * Step 2: Confirm setup — user submits their first code to prove the app is synced.
+     * This enables 2FA and returns one-time backup codes.
+     */
+    public static function confirm2FA()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        $input       = json_decode(file_get_contents('php://input'), true);
+        $code        = trim($input['code'] ?? '');
+
+        $user = R::load('users', $currentUser->user->id);
+
+        if (!$user->id) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found.']);
+            exit;
+        }
+
+        if ($user->totp_enabled) {
+            http_response_code(400);
+            echo json_encode(['error' => '2FA is already enabled.']);
+            exit;
+        }
+
+        if (empty($user->totp_secret)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No 2FA setup found. Call /setup-2fa first.']);
+            exit;
+        }
+
+        $google2fa = new Google2FA();
+        if (!$google2fa->verifyKey($user->totp_secret, $code)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Invalid code. Make sure your authenticator app is synced.']);
+            exit;
+        }
+
+        // Enable 2FA
+        $user->totp_enabled     = 1;
+        $user->totp_verified_at = R::isoDateTime();
+        R::store($user);
+
+        // Generate backup codes
+        $backupCodes = self::generateBackupCodes($user->id);
+
+        echo json_encode([
+            'status'       => 'success',
+            'message'      => '2FA enabled successfully.',
+            'backup_codes' => $backupCodes, // shown ONCE — user must save these
+        ]);
+        exit;
+    }
+
+    /**
+     * Step 3 (at login): Verify the 6-digit code after password check.
+     * Accepts the pre_auth_token from login response.
+     */
+    public static function verify2FA()
+    {
+        $input        = json_decode(file_get_contents('php://input'), true);
+        $preAuthToken = trim($input['pre_auth_token'] ?? '');
+        $code         = trim($input['code'] ?? '');
+
+        if (!$preAuthToken || !$code) {
+            http_response_code(422);
+            echo json_encode(['error' => 'pre_auth_token and code are required.']);
+            exit;
+        }
+
+        // Decode the pre-auth token
+        try {
+            $decoded = JWT::decode($preAuthToken, new \Firebase\JWT\Key(env('JWT_SECRET'), 'HS256'));
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid or expired session. Please log in again.']);
+            exit;
+        }
+
+        if (($decoded->type ?? '') !== 'pre_auth') {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid token type.']);
+            exit;
+        }
+
+        $user = R::load('users', $decoded->sub);
+
+        if (!$user->id) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found.']);
+            exit;
+        }
+
+        // Try TOTP code first, then backup codes
+        $google2fa = new Google2FA();
+        $validTotp = $google2fa->verifyKey($user->totp_secret, $code);
+
+        if (!$validTotp && !self::consumeBackupCode($user->id, $code)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Invalid code.']);
+            exit;
+        }
+
+        // Issue full JWT — same structure as login()
+        $roles   = UserRole::getUserRoles($user->id);
+        $payload = [
+            'user' => [
+                'id'        => $user->id,
+                'username'  => $user->username,
+                'firstname' => $user->firstname,
+                'lastname'  => $user->lastname,
+                'email'     => $user->email,
+                'uuid'      => $user->uuid,
+                'verified'  => $user->verified,
+                'status'    => $user->status,
+                'roles'     => $roles,
+            ],
+            'iat' => time(),
+        ];
+
+        $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
+
+        echo json_encode([
+            'status' => 'success',
+            'token'  => $jwt,
+            'user'   => [
+                'id'           => $user->id,
+                'username'     => $user->username,
+                'firstname'    => $user->firstname,
+                'lastname'     => $user->lastname,
+                'email'        => $user->email,
+                'uuid'         => $user->uuid,
+                'verified'     => $user->verified,
+                'status'       => $user->status,
+                'roles'        => $roles,
+                'biography'    => $user->biography,
+                'headline'     => $user->headline,
+                'user_picture' => Media::getMediaById($user->user_picture),
+                'link_website' => $user->link_website,
+                'link_x'       => $user->link_x,
+                'link_linkedin'  => $user->link_linkedin,
+                'link_instagram' => $user->link_instagram,
+                'link_facebook'  => $user->link_facebook,
+                'link_tiktok'    => $user->link_tiktok,
+                'link_youtube'   => $user->link_youtube,
+                'link_github'    => $user->link_github,
+            ]
+        ]);
+        exit;
+    }
+
+    /**
+     * Disable 2FA — requires a valid TOTP code to confirm.
+     */
+    public static function disable2FA()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        $input       = json_decode(file_get_contents('php://input'), true);
+        $code        = trim($input['code'] ?? '');
+
+        $user = R::load('users', $currentUser->user->id);
+
+        if (!$user->id) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found.']);
+            exit;
+        }
+
+        if (!$user->totp_enabled) {
+            http_response_code(400);
+            echo json_encode(['error' => '2FA is not enabled.']);
+            exit;
+        }
+
+        $google2fa = new Google2FA();
+        if (!$google2fa->verifyKey($user->totp_secret, $code)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Invalid code. Confirm with your authenticator app to disable.']);
+            exit;
+        }
+
+        // Clear all 2FA data
+        $user->totp_secret      = null;
+        $user->totp_enabled     = 0;
+        $user->totp_verified_at = null;
+        R::store($user);
+
+        // Delete backup codes
+        R::exec('DELETE FROM user_2fa_backup_codes WHERE user_id = ?', [$user->id]);
+
+        echo json_encode([
+            'status'  => 'success',
+            'message' => '2FA disabled successfully.',
+        ]);
+        exit;
+    }
+
+    /**
+     * Get 2FA status for the current user.
+     */
+    public static function get2FAStatus()
+    {
+        $currentUser = AuthController::getCurrentUser();
+        $user        = R::load('users', $currentUser->user->id);
+
+        if (!$user->id) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found.']);
+            exit;
+        }
+
+        // Count remaining backup codes
+        $remaining = (int) R::getCell(
+            'SELECT COUNT(*) FROM user_2fa_backup_codes WHERE user_id = ? AND used_at IS NULL',
+            [$user->id]
+        );
+
+        echo json_encode([
+            'status'                  => 'success',
+            'totp_enabled'            => (bool) $user->totp_enabled,
+            'totp_verified_at'        => $user->totp_verified_at,
+            'backup_codes_remaining'  => $remaining,
+        ]);
+        exit;
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    /**
+     * Generate 8 one-time backup codes, store hashed, return plaintext once.
+     */
+    private static function generateBackupCodes(int $userId): array
+    {
+        // Use raw SQL — RedBeanPHP can't dispense bean types with underscores
+        R::exec('DELETE FROM user_2fa_backup_codes WHERE user_id = ?', [$userId]);
+
+        $plainCodes = [];
+
+        for ($i = 0; $i < 8; $i++) {
+            $code = strtoupper(bin2hex(random_bytes(4))); // e.g. "A1B2C3D4"
+            $hash = password_hash($code, PASSWORD_BCRYPT);
+
+            R::exec(
+                'INSERT INTO user_2fa_backup_codes (user_id, code_hash, used_at, created_at) VALUES (?, ?, NULL, NOW())',
+                [$userId, $hash]
+            );
+
+            $plainCodes[] = $code;
+        }
+
+        return $plainCodes;
+    }
+    /**
+     * Check if input matches an unused backup code. Marks it used if valid.
+     */
+    private static function consumeBackupCode(int $userId, string $inputCode): bool
+    {
+        $rows = R::getAll(
+            'SELECT id, code_hash FROM user_2fa_backup_codes WHERE user_id = ? AND used_at IS NULL',
+            [$userId]
+        );
+
+        foreach ($rows as $row) {
+            if (password_verify($inputCode, $row['code_hash'])) {
+                R::exec(
+                    'UPDATE user_2fa_backup_codes SET used_at = NOW() WHERE id = ?',
+                    [$row['id']]
+                );
+                return true;
+            }
+        }
+
+        return false;
     }
 }

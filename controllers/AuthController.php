@@ -14,43 +14,97 @@ class AuthController
 
     public static function init()
     {
-        self::$jwt_key = env('JWT_SECRET'); // assign here
+        self::$jwt_key = env('JWT_SECRET');
     }
 
-
+    // ── Auth ──────────────────────────────────────────────────────────────────
 
     public static function login()
     {
-        // $input = json_decode(file_get_contents('php://input'), true);
-
         $input = json_decode(file_get_contents('php://input'), true);
-        $result = User::login($input);
 
         try {
-            if (isset($result['error']) && $result['error']) {
-                http_response_code($result['status']);
-                echo json_encode(['errors' => $result['errors']]);
-                return;
-            }
-            // echo json_encode($result);   
+            User::login($input);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
-            return;
         }
     }
 
+    public static function register()
+    {
+        $input  = json_decode(file_get_contents('php://input'), true);
+        $result = User::create($input);
+
+        if (isset($result['error']) && $result['error']) {
+            http_response_code($result['status']);
+            echo json_encode(['errors' => $result['errors']]);
+            return;
+        }
+
+        echo json_encode($result);
+    }
+
+    // ── 2FA ───────────────────────────────────────────────────────────────────
+
+    public static function setup2FA()
+    {
+        try {
+            User::setup2FA();
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    public static function confirm2FA()
+    {
+        try {
+            User::confirm2FA();
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    public static function verify2FA()
+    {
+        try {
+            User::verify2FA();
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    public static function disable2FA()
+    {
+        try {
+            User::disable2FA();
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    public static function get2FAStatus()
+    {
+        try {
+            User::get2FAStatus();
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    // ── Token Helpers ─────────────────────────────────────────────────────────
 
     public static function getCurrentUser($returnNullIfNoToken = false)
     {
         $headers = getallheaders();
 
-        // If no token and we want to return null instead of exiting
         if (!isset($headers['Authorization'])) {
-            if ($returnNullIfNoToken) {
-                return null;
-            }
-
+            if ($returnNullIfNoToken) return null;
             http_response_code(401);
             echo json_encode(['error' => 'No token provided']);
             exit;
@@ -60,14 +114,20 @@ class AuthController
 
         try {
             $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
-            return $decoded;
-        } catch (Exception $e) {
-            if ($returnNullIfNoToken) {
-                return null;
+
+            // Guard: token must have a user object with an id
+            if (empty($decoded->user) || empty($decoded->user->id)) {
+                if ($returnNullIfNoToken) return null;
+                http_response_code(401);
+                echo json_encode(['message' => 'Token payload invalid']);
+                exit;
             }
 
+            return $decoded;
+        } catch (Exception $e) {
+            if ($returnNullIfNoToken) return null;
             http_response_code(401);
-            echo json_encode(['message' => 'Invalid or expired token']);
+            echo json_encode(['message' => 'Invalid or expired token: ' . $e->getMessage()]); // ← add message to see WHY
             exit;
         }
     }
@@ -75,27 +135,11 @@ class AuthController
     public static function verify($token)
     {
         try {
-            // ✅ Use Key object with the secret & algorithm
-            $decoded = JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
-            return $decoded;
+            return JWT::decode($token, new Key(env('JWT_SECRET'), 'HS256'));
         } catch (\Exception $e) {
-            return false; // Token invalid or expired
+            return false;
         }
-    }
-    // Register method using UserRedBean and validation 
-    public static function register()
-    {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $result = User::create($input);
-
-        if (isset($result['error']) && $result['error']) {
-            http_response_code($result['status']);
-            echo json_encode(['errors' => $result['errors']]);
-            return;
-        }
-        echo json_encode($result);
     }
 }
-
 
 AuthController::init();

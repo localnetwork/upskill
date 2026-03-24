@@ -45,6 +45,28 @@ $router->group('/api', function ($r, $prefix) {
         AuthController::register();
     });
 
+    // 2FA Routes — no token needed
+    $r->add('POST', $prefix . '/verify-2fa', function () {
+        AuthController::verify2FA();
+    });
+
+    // 2FA Routes — Bearer token required
+    $r->add('GET', $prefix . '/2fa-status', function () {
+        AuthController::get2FAStatus();
+    });
+
+    $r->add('POST', $prefix . '/setup-2fa', function () {
+        AuthController::setup2FA();
+    });
+
+    $r->add('POST', $prefix . '/confirm-2fa', function () {
+        AuthController::confirm2FA();
+    });
+
+    $r->add('POST', $prefix . '/disable-2fa', function () {
+        AuthController::disable2FA();
+    });
+
     // ==================== USER ROUTES ====================
     $r->add('GET', $prefix . '/profile', function () {
         $user = jwt_middleware();

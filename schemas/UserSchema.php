@@ -19,6 +19,9 @@ return [
     'password' => 'VARCHAR(255) NOT NULL',
     'verified' => 'BOOLEAN DEFAULT FALSE',
     'status'   => 'TINYINT(1) DEFAULT 1',
+    'totp_secret' => 'VARCHAR(255) DEFAULT NULL',
+    'totp_enabled' => 'BOOLEAN DEFAULT FALSE',
+    'totp_verified_at' => 'TIMESTAMP NULL DEFAULT NULL',
     '_foreign' => [
         'fk_user_picture' => 'FOREIGN KEY (user_picture) REFERENCES media(id) ON DELETE CASCADE',
     ]

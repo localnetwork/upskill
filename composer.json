@@ -4,7 +4,9 @@
     "gabordemooij/redbean": "^5.7",
     "rakit/validation": "^1.4",
     "ramsey/uuid": "^4.9",
-    "ezyang/htmlpurifier": "^4.19"
+    "ezyang/htmlpurifier": "^4.19",
+    "pragmarx/google2fa": "^9.0",
+    "bacon/bacon-qr-code": "^3.0"
   },
   "scripts": {
     "start": "php -S localhost:8000 index.php",
