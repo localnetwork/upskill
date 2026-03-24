@@ -527,49 +527,108 @@ class User
      * Step 3 (at login): Verify the 6-digit code after password check.
      * Accepts the pre_auth_token from login response.
      */
-    public static function verify2FA()
+    public static function verifyTwoFactorCode(array $input)
     {
-        $input        = json_decode(file_get_contents('php://input'), true);
-        $preAuthToken = trim($input['pre_auth_token'] ?? '');
-        $code         = trim($input['code'] ?? '');
+        header('Content-Type: application/json');
 
-        if (!$preAuthToken || !$code) {
-            http_response_code(422);
-            echo json_encode(['error' => 'pre_auth_token and code are required.']);
-            exit;
+        // ✅ VALIDATE INPUT WITH RAKIT
+        $validator  = new \Rakit\Validation\Validator;
+        $validation = $validator->make($input, [
+            'code'           => 'required|digits:6',
+            'pre_auth_token' => 'required|min:10',
+        ], [
+            'code:required'             => 'Verification code is required.',
+            'code:digits'               => 'Verification code must be exactly 6 digits.',
+            'pre_auth_token:required'   => 'Pre-auth token is required.',
+            'pre_auth_token:min'        => 'Pre-auth token is invalid or expired.',
+        ]);
+
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'status'  => 'error',
+                'message' => 'Validation failed.',
+                'errors'  => $validation->errors()->firstOfAll(),
+                'http_code' => 422
+            ];
         }
+
+        // ✅ FIX: Extract and sanitize validated inputs from $input
+        $preAuthToken = trim($input['pre_auth_token']);
+        $code = trim($input['code']);
 
         // Decode the pre-auth token
         try {
             $decoded = JWT::decode($preAuthToken, new \Firebase\JWT\Key(env('JWT_SECRET'), 'HS256'));
         } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid or expired session. Please log in again.']);
-            exit;
+            return [
+                'status'  => 'error',
+                'message' => 'Invalid or expired session. Please log in again.',
+                'http_code' => 401
+            ];
         }
 
         if (($decoded->type ?? '') !== 'pre_auth') {
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid token type.']);
-            exit;
+            return [
+                'status'  => 'error',
+                'message' => 'Invalid token type.',
+                'http_code' => 401
+            ];
         }
 
         $user = R::load('users', $decoded->sub);
 
         if (!$user->id) {
-            http_response_code(404);
-            echo json_encode(['error' => 'User not found.']);
-            exit;
+            return [
+                'status'  => 'error',
+                'message' => 'User not found.',
+                'http_code' => 404
+            ];
+        }
+
+        // Check if 2FA is actually enabled
+        if (!$user->totp_enabled) {
+            return [
+                'status'  => 'error',
+                'message' => '2FA is not enabled for this account.',
+                'http_code' => 400
+            ];
+        }
+
+        // ✅ IMPROVED: Check if totp_secret exists
+        if (empty($user->totp_secret)) {
+            return [
+                'status'  => 'error',
+                'message' => '2FA secret not found. Please contact support.',
+                'http_code' => 400
+            ];
         }
 
         // Try TOTP code first, then backup codes
         $google2fa = new Google2FA();
-        $validTotp = $google2fa->verifyKey($user->totp_secret, $code);
 
-        if (!$validTotp && !self::consumeBackupCode($user->id, $code)) {
-            http_response_code(422);
-            echo json_encode(['error' => 'Invalid code.']);
-            exit;
+        // ✅ IMPROVED: Add debugging
+        $validTotp = false;
+        try {
+            $validTotp = $google2fa->verifyKey($user->totp_secret, $code, 1); // Allow 1 minute drift
+        } catch (\Exception $e) {
+            error_log("TOTP verification error: " . $e->getMessage());
+        }
+
+        // If TOTP fails, try backup codes
+        $validBackup = false;
+        if (!$validTotp) {
+            $validBackup = self::consumeBackupCode($user->id, $code);
+        }
+
+        // ✅ IMPROVED: Return specific error message
+        if (!$validTotp && !$validBackup) {
+            return [
+                'status'  => 'error',
+                'message' => 'Verification code is incorrect. Please check your authenticator app or use a backup code.',
+                'http_code' => 422
+            ];
         }
 
         // Issue full JWT — same structure as login()
@@ -591,8 +650,12 @@ class User
 
         $jwt = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
 
-        echo json_encode([
+        // ✅ Fix: Get user_picture safely
+        $user_picture = $user->user_picture ? Media::getMediaById($user->user_picture) : null;
+
+        return [
             'status' => 'success',
+            'message' => '2FA verification successful.',
             'token'  => $jwt,
             'user'   => [
                 'id'           => $user->id,
@@ -606,7 +669,7 @@ class User
                 'roles'        => $roles,
                 'biography'    => $user->biography,
                 'headline'     => $user->headline,
-                'user_picture' => Media::getMediaById($user->user_picture),
+                'user_picture' => $user_picture,
                 'link_website' => $user->link_website,
                 'link_x'       => $user->link_x,
                 'link_linkedin'  => $user->link_linkedin,
@@ -615,9 +678,9 @@ class User
                 'link_tiktok'    => $user->link_tiktok,
                 'link_youtube'   => $user->link_youtube,
                 'link_github'    => $user->link_github,
-            ]
-        ]);
-        exit;
+            ],
+            'http_code' => 200
+        ];
     }
 
     /**
@@ -728,19 +791,28 @@ class User
      */
     private static function consumeBackupCode(int $userId, string $inputCode): bool
     {
-        $rows = R::getAll(
-            'SELECT id, code_hash FROM user_2fa_backup_codes WHERE user_id = ? AND used_at IS NULL',
-            [$userId]
-        );
+        // ✅ IMPROVED: Validate input before querying
+        if (empty($inputCode) || strlen($inputCode) < 6) {
+            return false;
+        }
 
-        foreach ($rows as $row) {
-            if (password_verify($inputCode, $row['code_hash'])) {
-                R::exec(
-                    'UPDATE user_2fa_backup_codes SET used_at = NOW() WHERE id = ?',
-                    [$row['id']]
-                );
-                return true;
+        try {
+            $rows = R::getAll(
+                'SELECT id, code_hash FROM user_2fa_backup_codes WHERE user_id = ? AND used_at IS NULL',
+                [$userId]
+            );
+
+            foreach ($rows as $row) {
+                if (password_verify($inputCode, $row['code_hash'])) {
+                    R::exec(
+                        'UPDATE user_2fa_backup_codes SET used_at = NOW() WHERE id = ?',
+                        [$row['id']]
+                    );
+                    return true;
+                }
             }
+        } catch (\Exception $e) {
+            error_log("Backup code verification error: " . $e->getMessage());
         }
 
         return false;

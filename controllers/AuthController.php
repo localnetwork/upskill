@@ -70,11 +70,28 @@ class AuthController
     public static function verify2FA()
     {
         try {
-            User::verify2FA();
+            header('Content-Type: application/json');
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            // ✅ FIX: Call the method and get the result
+            $result = User::verifyTwoFactorCode($input);
+
+            // ✅ FIX: Extract http_code and set it
+            $httpCode = $result['http_code'] ?? 500;
+            http_response_code($httpCode);
+
+            // ✅ FIX: Remove http_code from response and echo the result
+            unset($result['http_code']);
+            echo json_encode($result);
         } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
         }
+        exit;
     }
 
     public static function disable2FA()
