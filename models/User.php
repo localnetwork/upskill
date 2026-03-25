@@ -759,7 +759,7 @@ class User
     }
 
     // =========================================================================
-    // PRIVATE HELPERS
+    // PRIVATE HELPERS 
     // =========================================================================
 
     /**
@@ -767,7 +767,7 @@ class User
      */
     private static function generateBackupCodes(int $userId): array
     {
-        // Use raw SQL — RedBeanPHP can't dispense bean types with underscores
+        // Use raw SQL — RedBeanPHP can't dispense bean types with underscores 
         R::exec('DELETE FROM user_2fa_backup_codes WHERE user_id = ?', [$userId]);
 
         $plainCodes = [];
@@ -777,8 +777,8 @@ class User
             $hash = password_hash($code, PASSWORD_BCRYPT);
 
             R::exec(
-                'INSERT INTO user_2fa_backup_codes (user_id, code_hash, used_at, created_at) VALUES (?, ?, NULL, NOW())',
-                [$userId, $hash]
+                'INSERT INTO user_2fa_backup_codes (user_id, code_hash, used_at, created_at, uuid) VALUES (?, ?, NULL, NOW(), ?)',
+                [$userId, $hash, Uuid::uuid4()->toString()]
             );
 
             $plainCodes[] = $code;
@@ -786,6 +786,109 @@ class User
 
         return $plainCodes;
     }
+    /** 
+     * Redeem a backup code at login using a pre_auth_token.
+     * No full JWT exists yet — user identity comes from the pre-auth token.
+     */
+    public static function redeemBackupCode($input)
+    {
+        $preAuthToken = trim($input['pre_auth_token'] ?? '');
+        $code         = trim($input['code'] ?? '');
+
+        if (empty($preAuthToken) || empty($code)) {
+            return [
+                'status'    => 'error',
+                'message'   => 'pre_auth_token and code are required.',
+                'http_code' => 422
+            ];
+        }
+
+        try {
+            $decoded = JWT::decode($preAuthToken, new \Firebase\JWT\Key(env('JWT_SECRET'), 'HS256'));
+        } catch (\Exception $e) {
+            return [
+                'status'    => 'error',
+                'message'   => 'Invalid or expired session. Please log in again.',
+                'http_code' => 401
+            ];
+        }
+
+        if (($decoded->type ?? '') !== 'pre_auth') {
+            return [
+                'status'    => 'error',
+                'message'   => 'Invalid token type.',
+                'http_code' => 401
+            ];
+        }
+
+        $user = R::load('users', (int) $decoded->sub);
+
+        if (!$user->id) {
+            return [
+                'status'    => 'error',
+                'message'   => 'User not found.',
+                'http_code' => 404
+            ];
+        }
+
+        if (!self::consumeBackupCode($user->id, $code)) {
+            return [
+                'status'    => 'error',
+                'message'   => 'Invalid or already used backup code.',
+                'http_code' => 422
+            ];
+        }
+
+        // Issue full JWT — same structure as verifyTwoFactorCode()
+        $roles   = UserRole::getUserRoles($user->id);
+        $payload = [
+            'user' => [
+                'id'        => $user->id,
+                'username'  => $user->username,
+                'firstname' => $user->firstname,
+                'lastname'  => $user->lastname,
+                'email'     => $user->email,
+                'uuid'      => $user->uuid,
+                'verified'  => $user->verified,
+                'status'    => $user->status,
+                'roles'     => $roles,
+            ],
+            'iat' => time(),
+        ];
+
+        $jwt          = JWT::encode($payload, env('JWT_SECRET'), 'HS256');
+        $user_picture = $user->user_picture ? Media::getMediaById($user->user_picture) : null;
+
+        return [
+            'status'  => 'success',
+            'message' => 'Backup code accepted. You are now logged in.',
+            'token'   => $jwt,
+            'user'    => [
+                'id'             => $user->id,
+                'username'       => $user->username,
+                'firstname'      => $user->firstname,
+                'lastname'       => $user->lastname,
+                'email'          => $user->email,
+                'uuid'           => $user->uuid,
+                'verified'       => $user->verified,
+                'status'         => $user->status,
+                'roles'          => $roles,
+                'biography'      => $user->biography,
+                'headline'       => $user->headline,
+                'user_picture'   => $user_picture,
+                'link_website'   => $user->link_website,
+                'link_x'         => $user->link_x,
+                'link_linkedin'  => $user->link_linkedin,
+                'link_instagram' => $user->link_instagram,
+                'link_facebook'  => $user->link_facebook,
+                'link_tiktok'    => $user->link_tiktok,
+                'link_youtube'   => $user->link_youtube,
+                'link_github'    => $user->link_github,
+            ],
+            'http_code' => 200
+        ];
+    }
+
     /**
      * Check if input matches an unused backup code. Marks it used if valid.
      */
@@ -816,5 +919,88 @@ class User
         }
 
         return false;
+    }
+
+    public static function regenerateBackupCodes(array $input)
+    {
+        header('Content-Type: application/json');
+
+        // Must be logged in (Bearer token)
+        $currentUser = AuthController::getCurrentUser();
+        $user        = R::load('users', (int) $currentUser->user->id);
+
+        if (!$user->id) {
+            return [
+                'status'    => 'error',
+                'message'   => 'User not found.',
+                'http_code' => 404
+            ];
+        }
+
+        if (!$user->totp_enabled) {
+            return [
+                'status'    => 'error',
+                'message'   => '2FA is not enabled for this account.',
+                'http_code' => 400
+            ];
+        }
+
+        if (empty($user->totp_secret)) {
+            return [
+                'status'    => 'error',
+                'message'   => '2FA secret not found. Please contact support.',
+                'http_code' => 400
+            ];
+        }
+
+        // Validate input (require a current TOTP code)
+        $validator  = new \Rakit\Validation\Validator;
+        $validation = $validator->make($input, [
+            'code' => 'required|digits:6',
+        ], [
+            'code:required' => 'Verification code is required.',
+            'code:digits'   => 'Verification code must be exactly 6 digits.',
+        ]);
+
+        $validation->validate();
+
+        if ($validation->fails()) {
+            return [
+                'status'    => 'error',
+                'message'   => 'Validation failed.',
+                'errors'    => $validation->errors()->firstOfAll(),
+                'http_code' => 422
+            ];
+        }
+
+        $code = trim($input['code']);
+
+        // Verify the code before regenerating
+        $google2fa = new Google2FA();
+        $validTotp = false;
+
+        try {
+            $validTotp = $google2fa->verifyKey($user->totp_secret, $code, 1); // allow small drift
+        } catch (\Exception $e) {
+            error_log("TOTP verification error (regen backup codes): " . $e->getMessage());
+        }
+
+        if (!$validTotp) {
+            return [
+                'status'    => 'error',
+                'message'   => 'Invalid verification code.',
+                'http_code' => 422
+            ];
+        }
+
+        // Regenerate backup codes (deletes old + inserts new hashed)
+        $backupCodes = self::generateBackupCodes((int) $user->id);
+
+        return [
+            'status'       => 'success',
+            'message'      => 'Backup codes regenerated successfully. Save these now — they will not be shown again.',
+            'backup_codes' => $backupCodes,
+            'http_code'    => 200
+        ];
     }
 }

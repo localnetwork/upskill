@@ -94,6 +94,29 @@ class AuthController
         exit;
     }
 
+    public static function redeemBackupCode()
+    {
+        try {
+            header('Content-Type: application/json');
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            $result   = User::redeemBackupCode($input);
+            $httpCode = $result['http_code'] ?? 200;
+            http_response_code($httpCode);
+
+            unset($result['http_code']);
+            echo json_encode($result);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'status'  => 'error',
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+        exit;
+    }
+
     public static function disable2FA()
     {
         try {
@@ -103,6 +126,8 @@ class AuthController
             echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
         }
     }
+
+
 
     public static function get2FAStatus()
     {
@@ -156,6 +181,31 @@ class AuthController
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+
+    public static function regenerateBackupCodes()
+    {
+        try {
+            header('Content-Type: application/json');
+
+            $input = json_decode(file_get_contents('php://input'), true) ?? [];
+
+            $result   = User::regenerateBackupCodes($input);
+            $httpCode = $result['http_code'] ?? 200;
+
+            http_response_code($httpCode);
+
+            unset($result['http_code']);
+            echo json_encode($result);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'status'  => 'error',
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+        exit;
     }
 }
 

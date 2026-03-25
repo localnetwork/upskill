@@ -66,6 +66,14 @@ $router->group('/api', function ($r, $prefix) {
     $r->add('POST', $prefix . '/disable-2fa', function () {
         AuthController::disable2FA();
     });
+    $r->add('POST', $prefix . '/verify-backup-code', function () {
+        AuthController::redeemBackupCode();
+    });
+
+    // 2FA Routes — Bearer token required 
+    $r->add('POST', $prefix . '/regenerate-backup-codes', function () {
+        AuthController::regenerateBackupCodes();
+    });
 
     // ==================== USER ROUTES ====================
     $r->add('GET', $prefix . '/profile', function () {
