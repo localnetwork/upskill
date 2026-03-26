@@ -13,3 +13,8 @@ RewriteRule ^ - [L]
         Header set Access-Control-Allow-Origin "*" 
     </FilesMatch>
 </IfModule>
+
+<FilesMatch "\.(ts|m3u8)$">
+Order Deny,Allow
+Deny from all
+</FilesMatch>

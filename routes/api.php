@@ -21,6 +21,8 @@ require_once __DIR__ . '/../controllers/CheckoutController.php';
 require_once __DIR__ . '/../controllers/OrderController.php';
 require_once __DIR__ . '/../controllers/CurriculumProgressController.php';
 require_once __DIR__ . '/../controllers/CategoryController.php';
+require_once __DIR__ . '/../controllers/PayoutAccountController.php';
+
 
 $router = new Router();
 
@@ -244,6 +246,20 @@ $router->group('/api', function ($r, $prefix) {
         // instructor_middleware();
         jwt_middleware();
         MediaController::create();
+    });
+
+
+    $r->add('POST', $prefix . '/payout-accounts', function () {
+        jwt_middleware();
+        instructor_middleware();
+        PayoutAccountController::createPayoutAccount();
+    });
+
+    $r->add('GET', $prefix . '/payout-accounts', function () {
+
+        jwt_middleware();
+        instructor_middleware();
+        PayoutAccountController::getCurrentUserPayoutAccounts();
     });
 
 

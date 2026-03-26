@@ -18,6 +18,7 @@ return [
     'email'    => 'VARCHAR(255) NOT NULL',
     'password' => 'VARCHAR(255) NOT NULL',
     'verified' => 'BOOLEAN DEFAULT FALSE',
+    'is_suspended' => 'BOOLEAN DEFAULT FALSE',
     'status'   => 'TINYINT(1) DEFAULT 1',
     'totp_secret' => 'VARCHAR(255) DEFAULT NULL',
     'totp_enabled' => 'BOOLEAN DEFAULT FALSE',

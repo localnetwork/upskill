@@ -788,7 +788,7 @@ class Course
 
 
             // ✅ Ensure upload directory
-            $uploadDir = __DIR__ . '/../assets/videos/';
+            $uploadDir = __DIR__ . '/../assets/uploads/';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0777, true);
             }
@@ -805,7 +805,7 @@ class Course
             $videoTitle = $input['title'] ?? pathinfo($file['name'], PATHINFO_FILENAME);
             $videoId = Video::create([
                 'title'     => $videoTitle,
-                'path'      => '/assets/videos/' . $fileName,
+                'path'      => '/assets/uploads/' . $fileName,
                 'type'      => $fileType,
                 'size'      => $file['size'],
                 'author_id' => $authorId
